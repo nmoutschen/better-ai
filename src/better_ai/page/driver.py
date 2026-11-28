@@ -1171,7 +1171,7 @@ class Driver:
             id=uuid.uuid4().hex[:16],
             event=event,
             peer=self._peer,
-            who=event.requester or "page agent",
+            who=event.requester or "The page agent",  # the pop-up's title starts with it: "<who> wants ..."
             tool=tool,
             arguments=arguments,
             since=time.time(),

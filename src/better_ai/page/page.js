@@ -971,7 +971,7 @@ function pageConversation(o) {
       }).catch(function () {}).then(function () { pagePollAgain(count, 5000); });
     })();
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
-    // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
+    // A page that streams events counts the stream's polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
     // Once a request was refused as out of date the strip stays: no later poll or stream event clears it.
     function connected(on) {
@@ -996,17 +996,6 @@ function pageConversation(o) {
       try { if (o.beforeReload) o.beforeReload(); } catch (e) {}
       location.reload();
     });
-    // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
-    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more. It goes
-    // through pageFetch like every request: a page out of date shows only that strip, and asks nothing more.
-    var unwatched = document.querySelector('.unwatched');
-    if (!pageDriven) (function watch() {
-      pageFetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
-        unwatched.hidden = pageIsStale || on !== false;
-        if (!streaming) connected(true);
-      }).catch(function () { unwatched.hidden = true; if (!streaming) connected(false); })
-        .then(function () { pagePollAgain(watch, 2000); });
-    })();
   }
 
   return {

@@ -385,10 +385,6 @@ li.trow.closing { display:flex; justify-content:space-between; align-items:cente
 .thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
 .msg .what { margin:var(--space-tight) 0 0; font:var(--font-small-strong); color:var(--ink); }
 
-/* Above the message box when no agent is watching, so a note sent then is not lost in silence. */
-.unwatched { margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:var(--font-message); }
-.unwatched[hidden] { display:none; }
-
 .toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
   background:var(--umber); color:var(--cream); padding:var(--space-item) var(--space-edge); font:var(--font-body-strong);
   box-shadow:var(--shadow); }

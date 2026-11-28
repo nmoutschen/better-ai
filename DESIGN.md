@@ -182,7 +182,7 @@ The side column holds the conversation, and above it a list of the agents at wor
 2. `.notes-top`: the label "Conversation", and the All / Open filter when the board has items the user accepts.
 3. `p.empty` until the first message; it says what the user can click to comment, and that they can write below.
 4. `ol.thread`: the items in time order. What waits for the user comes last, next to the message box.
-5. `.composer`: a panel for a decision when one is open (`.decide`), the `.unwatched` notice, the label "Message to …" naming the agent, the box, then `.send`: Send first, then the quiet buttons (Decide…, Copy all, Review again…), then the status line.
+5. `.composer`: a panel for a decision when one is open (`.decide`), the label "Message to …" naming the agent, the box, then `.send`: Send first, then the quiet buttons (Decide…, Copy all, Review again…), then the status line.
 
 - What waits for the user comes last in the thread. On a board with a stats header, a button figure there also counts it and goes to it.
 - A page opened as a file, with no agent, hides the side column and the view takes the whole width (show-better).
@@ -315,7 +315,6 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 | Class | Use |
 |---|---|
-| `.unwatched` | above the message box when no agent is watching, so the user knows a message waits |
 | `.offline` | under the header when the page's server stops answering |
 | `.toast` | a short confirmation at the bottom; moss-dark for done, error for failure |
 
@@ -352,3 +351,4 @@ None. A conflict between a rule above and a page is listed here until the user d
 - 2026-11-20: spacing tokens named by role, in seven steps instead of eleven (the user's choice): 2px became 4, 6 became 8, 10 became 12, and 32 became 40.
 - 2026-11-20: type styles became tokens (`--font-*`): each sets weight, size, line height and typeface, and replaces the full shorthand written in each rule. Line heights of the same style were made equal (1.4, 1.45 and 1.5 became the style's one value), and weight 600, which the page never loaded, became 700.
 - 2026-11-21: pop-ups lost the 2px ink border for the n14n band (the user's decision): the outline read heavy against the Journal style. Details pop-ups now open with a header (what, title, full question) and labelled sections; the research board shows a question's claims open, not folded, and states its status as a phrase instead of a dot-joined line.
+- 2026-11-28: the `.unwatched` notice is gone: every served page has its own agent, so no page waits unwatched.

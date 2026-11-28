@@ -393,10 +393,6 @@ li.trow.closing { display:flex; justify-content:space-between; align-items:cente
 .thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
 .msg .what { margin:var(--space-tight) 0 0; font:var(--font-small-strong); color:var(--ink); }
 
-/* Above the message box when no agent is watching, so a note sent then is not lost in silence. */
-.unwatched { margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:var(--font-message); }
-.unwatched[hidden] { display:none; }
-
 .toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
   background:var(--umber); color:var(--cream); padding:var(--space-item) var(--space-edge); font:var(--font-body-strong);
   box-shadow:var(--shadow); }
@@ -673,7 +669,6 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
     </div>
 
     <h3>Notices</h3>
-    <p class="unwatched narrow">The agent is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
     <p class="offline demo">The page's server stopped answering. Ask the agent to restart it.</p>
     <p class="spaced"><button type="button" class="btn btn--quiet" id="toast-ok">Show a toast</button></p>
 
@@ -1775,7 +1770,7 @@ function pageConversation(o) {
       }).catch(function () {}).then(function () { pagePollAgain(count, 5000); });
     })();
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
-    // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
+    // A page that streams events counts the stream's polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
     // Once a request was refused as out of date the strip stays: no later poll or stream event clears it.
     function connected(on) {
@@ -1800,17 +1795,6 @@ function pageConversation(o) {
       try { if (o.beforeReload) o.beforeReload(); } catch (e) {}
       location.reload();
     });
-    // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
-    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more. It goes
-    // through pageFetch like every request: a page out of date shows only that strip, and asks nothing more.
-    var unwatched = document.querySelector('.unwatched');
-    if (!pageDriven) (function watch() {
-      pageFetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
-        unwatched.hidden = pageIsStale || on !== false;
-        if (!streaming) connected(true);
-      }).catch(function () { unwatched.hidden = true; if (!streaming) connected(false); })
-        .then(function () { pagePollAgain(watch, 2000); });
-    })();
   }
 
   return {
