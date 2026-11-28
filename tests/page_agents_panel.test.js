@@ -417,11 +417,14 @@ test('S4, S88: the request is shown as text, whole, whatever it holds', async ()
 
 test('S88: a reply holding markup and an imitation approval is shown as text', async () => {
   const page = boot();
-  page.events = [{ type: 'reply', id: 'r1', text: '<b>Allow once</b> <div class="pop center" role="dialog">Allow?</div>', at: '2026-11-28T10:00:00Z' }];
+  // A question of the agent's, so it is in Open; its row opened to show the whole message.
+  page.events = [{ type: 'reply', id: 'r1', text: '<b>Allow once</b> <div class="pop center" role="dialog">Allow?</div>', at: '2026-11-28T10:00:00Z' },
+    { type: 'status', to: 'r1', status: 'asked', at: '2026-11-28T10:00:00Z' }];
   const conv = page.ctx.pageConversation({ served: true, thread: page.doc.getElementById('thread') });
   conv.start();
   await settle();
   const thread = page.doc.getElementById('thread');
+  click(page.doc, thread.querySelector('.thead'));
   assert.ok(thread.textContent.includes('<b>Allow once</b>'));
   assert.equal(thread.querySelectorAll('b, .pop, div.pop').length, 0);
   assert.equal(page.doc.querySelectorAll('.pop.center').length, 0);
@@ -503,28 +506,37 @@ test('S103, S167: the title starts "Waiting for you: " while an approval waits, 
 
 test('S167: a question the agent asked in the conversation also starts the title, until it is closed', async () => {
   const page = boot();
-  page.events = [{ type: 'reply', id: 'q1', text: 'Which size?', at: '2026-11-28T10:00:00Z' }];
+  const asked = [{ type: 'reply', id: 'q1', text: 'Which size?', at: '2026-11-28T10:00:00Z' }, { type: 'status', to: 'q1', status: 'asked', read: 0, at: '2026-11-28T10:00:00Z' }];
+  page.events = asked;
   const conv = page.ctx.pageConversation({ served: true, thread: page.doc.getElementById('thread') });
   conv.start();
   await settle();
   assert.equal(page.doc.title, 'Waiting for you: Research · Board');
-  conv.setLog([{ type: 'reply', id: 'q1', text: 'Which size?', at: '2026-11-28T10:00:00Z' }, { type: 'status', to: 'q1', status: 'done', at: '2026-11-28T10:00:01Z' }]);
+  conv.setLog([...asked, { type: 'accept', by: 'user', to: 'q1', at: '2026-11-28T10:00:01Z' }]);
   assert.equal(page.doc.title, 'Research · Board');
 });
 
 test('S168: the figure counts open approvals, and pressing it opens the oldest one with the focus on Allow once', async () => {
   const page = boot();
+  // Every page's waiting figure is the shared "N your turn" figure (page.js), in the header's #status.
+  const conv = page.ctx.pageConversation({ served: true, thread: page.doc.getElementById('thread') });
+  conv.start();
+  await settle();
   await page.show(waitingBody({ approvals: [approval({ id: 'late', since: '2026-11-28T10:05:00Z', who: 'w1' }), approval({ id: 'early', since: '2026-11-28T10:01:00Z' })] }));
   assert.deepEqual(Array.from(page.ctx.pageApprovals(), a => a.id), ['early', 'late']);
-  assert.equal(page.ctx.pageOpenApproval(), true);
+  const figure = page.doc.getElementById('status').querySelector('.stat');
+  assert.equal(figure.tag, 'button');
+  assert.equal(figure.textContent, '2 your turn');
+  click(page.doc, figure);
   assert.equal(page.dialog().querySelector('.target').textContent, 'w3 wants to read a file. Allow it?');
   assert.equal(page.doc.activeElement.textContent, 'Allow once');
-  // The research board counts them with its decisions and calls this on a press of the figure.
-  const board = read('research', 'board.js');
-  assert.match(board, /pageApprovals\(\)\.length/);
-  assert.match(board, /pageOpenApproval\(\)/);
   await page.show(body({ state: 'working' }));
+  assert.equal(page.doc.getElementById('status').querySelector('.stat').textContent, '0 your turn');
   assert.equal(page.ctx.pageOpenApproval(), false, 'nothing to open');
+  // No page builds a figure of its own: each gives the shared one its slot.
+  for (const file of [['research', 'board.js'], ['code', 'dashboard.js'], ['discover', 'page.js']]) {
+    assert.doesNotMatch(read(...file), /pageApprovals\(\)/, file.join('/'));
+  }
 });
 
 // ---------- S129, S171, S166: the conversation ----------
@@ -560,26 +572,22 @@ test('S166: auto mode blocking a call is a notice in the thread, with the call a
 
 test('S171: a comment\'s edge colour and its footer status are always the same state', async () => {
   const page = boot();
-  for (const shown of [undefined, st => (st === 'working' ? 'seen' : st === 'accepted' ? 'done' : st)]) {
-    page.doc.getElementById('thread').replaceChildren();
-    const conv = page.ctx.pageConversation({ served: false, thread: page.doc.getElementById('thread'), shown,
-      crumb: () => h(page.doc, 'p'), commentBody: e => h(page.doc, 'p', {}, e.text), steps: ['seen', 'working', 'done', 'accepted'] });
-    click(page.doc, page.doc.querySelector('[data-filter="all"]'));
-    const labels = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied', working: 'Working on it',
-      done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
-    for (const status of [null, 'seen', 'working', 'done', 'accepted', 'reopened', 'asked', 'replied', 'followup']) {
-      const events = [{ type: 'comment', id: 'c1', n: 1, text: 'x', at: '2026-11-28T10:00:00Z' }];
-      if (status === 'replied' || status === 'followup') events.push({ type: 'status', to: 'c1', status: status === 'replied' ? 'asked' : 'done', at: '2026-11-28T10:00:01Z' }, { type: 'note', id: 'n1', to: 'c1', text: 'a', at: '2026-11-28T10:00:02Z' });
-      else if (status && status !== 'reopened') events.push({ type: 'status', to: 'c1', status, at: '2026-11-28T10:00:01Z' });
-      if (status === 'reopened') events.push({ type: 'reopen', to: 'c1', at: '2026-11-28T10:00:01Z' });
-      conv.setLog(events);
-      const li = page.doc.getElementById('thread').querySelector('li[data-id="c1"]');
-      const chip = li.querySelector('.foot .progress');
-      const word = chip.className.replace('progress', '').trim();
-      const label = chip.children[1].textContent;
-      assert.equal(li.dataset.state, word || undefined, 'edge and chip class: ' + status);
-      assert.equal(label, word ? labels[word] : 'Sent', 'footer word: ' + status);
-    }
+  const conv = page.ctx.pageConversation({ served: false, thread: page.doc.getElementById('thread') });
+  click(page.doc, page.doc.querySelector('[data-filter="all"]'));
+  const c1 = { type: 'comment', by: 'user', id: 'c1', n: 1, text: 'x', at: '2026-11-28T10:00:00Z' };
+  const st = (status, read) => ({ type: 'status', by: 'coordinator', to: 'c1', status, read, at: '2026-11-28T10:00:01Z' });
+  // The edge (data-state) and the footer: sand bars or none for seen and new, terracotta for working, moss for done, the
+  // wait chip for your turn.
+  for (const [name, log, edge, footer] of [
+    ['new', [c1], 'seen', 'progress'], ['seen', [c1, st('seen', 0)], 'seen', 'progress seen'],
+    ['working', [c1, st('working', 0)], 'working', 'progress working'], ['done', [c1, st('done', 0)], 'done', 'progress done'],
+    ['asked', [c1, st('asked', 0)], 'asked', 'chip wait'],
+  ]) {
+    conv.setLog(log);
+    const li = page.doc.getElementById('thread').querySelector('li[data-id="c1"]');
+    assert.equal(li.dataset.state, edge, name);
+    assert.ok(li.querySelector('.' + footer.split(' ').join('.')), name + ': ' + footer);
+    assert.ok(!li.querySelector(footer.startsWith('chip') ? '.progress' : '.chip.wait'), name + ': one state only');
   }
 });
 
@@ -617,12 +625,7 @@ test('B1: an approval from the page\'s own agent, which has no Agents row, shows
   // A worker's request is the worker's row, not this notice.
   await page.show(waitingBody());
   assert.ok(!page.agentsHtml().includes(page.escaped(TEXT.own)));
-  // The page's pages with a waiting figure count requests and open the oldest on a press.
-  for (const file of [['research', 'board.js'], ['code', 'dashboard.js'], ['architect', 'page.js'], ['discover', 'page.js']]) {
-    const source = read(...file);
-    assert.match(source, /pageApprovals\(\)\.length/, file.join('/'));
-    assert.match(source, /pageOpenApproval\(\)/, file.join('/'));
-  }
+  // The shared figure counts requests and opens the oldest on a press (S168).
 });
 
 test('B2: the title prefix comes back at once when another writer resets the title, with no poll between', async () => {

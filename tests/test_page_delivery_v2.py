@@ -238,7 +238,8 @@ class WhatATurnCarries(Turns):
         found = sent(prompt)
         self.assertEqual(
             sorted((item["id"], item["status"]) for item in found["items"]),
-            sorted([("followup", "followup"), ("new", "new"), ("replied", "replied"), ("reopened", "reopened")]),
+            # A follow-up, an answer and a reopen each give the thread back to the agent, as new (page `threads`).
+            sorted([("followup", "new"), ("new", "new"), ("replied", "new"), ("reopened", "new")]),
         )
         # The user's answers under items and the reopen come as events beside the items they target.
         self.assertEqual([event["type"] for event in found["user_actions"]], ["note", "note", "reopen", "accept"])
@@ -317,17 +318,18 @@ class WhatATurnCarries(Turns):
             code, out, err = self.cli("pending", self.unit_arg)
         self.assertEqual((code, err), (0, ""))
         # The first prompt is the one turn so far: its lines are what `pending` prints for it.
-        shown = [line for line in prompt.splitlines() if line.startswith("{") or line.endswith("not done.")]
+        shown = [line for line in prompt.splitlines() if line.startswith("{") or " not done." in line]
         self.assertEqual(shown, out.splitlines())
         self.assertEqual(json.loads(shown[-2])["to"], "x")
-        self.assertEqual(shown[-1], "1 not done.")
+        # The last line gives the line to pass as --read, the same in the prompt and in pending (D12).
+        self.assertEqual(shown[-1], "1 not done. Pass --read 3 to status and reply.")
 
     def test_a_note_under_the_users_item_comes_with_its_thread_S126(self):
         self.seed(note("m1"), status("m1", "asked"), note("answer", to="m1"))
         self.make()
         (prompt,) = self.prompts()
         (item,) = sent(prompt)["items"]
-        self.assertEqual((item["id"], item["status"]), ("m1", "replied"))
+        self.assertEqual((item["id"], item["status"]), ("m1", "new"))  # the answer gives it back to the agent
         self.assertEqual([message["text"] for message in item["thread"]], ["answer"])
 
 

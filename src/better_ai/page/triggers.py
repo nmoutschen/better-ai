@@ -182,8 +182,8 @@ def _working_items(unit: Unit) -> list[tuple[str, datetime | None]]:
     at = {e.get("to"): e.get("at") for e in events if e.get("type") == "status"}
     return [
         (item["id"], _moment(at.get(item["id"])))
-        for item, state, _ in all_items(events, conv.items, conv.agent)
-        if state == "working"
+        for item, state, extra in all_items(events, conv.items, conv.agent)
+        if state == "agent" and extra["step"] == "working"
     ]
 
 

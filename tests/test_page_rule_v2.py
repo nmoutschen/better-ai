@@ -34,7 +34,7 @@ CLAUSES = (
     "NEVER serve",
     "WRITE what a step says to say or ask in the chat as a `reply` in the page",
     "GIVE the skill's hand-back as one `reply` without `--to`",
-    "LET the user accept only with Accept",
+    "LET the user accept only with ✓ in the page",
     "ASK them to press it WHEN they accept in words",
     "WHEN a step leads into a skill that serves its own page",
     "REPLY that the step starts from the user's chat, with what to ask there",

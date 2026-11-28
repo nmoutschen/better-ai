@@ -2,7 +2,7 @@
 
 The text, Markdown, screen-reader and page outputs are compared with golden files in `tests/fixtures/show/`, made by
 the old `show.py` from the same spec (every kind of slide and template): the move into the package changed none of
-them. The live page runs as a real server, as the agent runs it: `serve`, the user sends, `wait`, `reply`, `status`
+them. The live page runs as a real server, as the agent runs it: `serve`, the user sends, `reply`, `status`
 and `pending`.
 """
 

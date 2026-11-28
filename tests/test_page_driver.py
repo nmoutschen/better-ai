@@ -80,6 +80,7 @@ class Unit:
 class Batch:
     def __init__(self, items, events, position):
         self.items, self.events, self.position = items, events, position
+        self.read = position - 1  # the line the batch shows last, as Delivery holds it
 
     def prompt_items(self):
         return self.items

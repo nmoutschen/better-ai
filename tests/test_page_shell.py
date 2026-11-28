@@ -1,5 +1,5 @@
 """Tests for the shared live page in src/better_ai/page/: the shell, the server, the conversation and the verbs `serve`,
-`wait`, `reply`, `status` and `pending`.
+`reply`, `status` and `pending`.
 
 The page under test is a minimal fixture, not a skill's: its spec is put in `page.PAGES` for the skill whose unit kind it
 borrows (`code-better`, `.code/<slug>`), and its main section and events schema live in this test, not in a skill package.
@@ -223,7 +223,7 @@ class ShellTest(Fixture):
         return found
 
     def test_the_strips_are_the_same_text_for_every_page_except_the_role_S45(self):
-        # No `wait` is connected: the strips are hidden but their text is what the page shows when it needs them.
+        # No agent is listening: the strips are hidden but their text is what the page shows when it needs them.
         a, b = self.strips("coordinator"), self.strips("architect")
         self.assertEqual(a["unwatched"].replace("coordinator", "ROLE"), b["unwatched"].replace("architect", "ROLE"))
         self.assertEqual(a["offline"].replace("coordinator", "ROLE"), b["offline"].replace("architect", "ROLE"))
@@ -436,7 +436,7 @@ class ServerTest(Fixture):
         self.assertEqual(
             spec.sendable(), ("note", "comment", "delete", "accept", "reopen", "answer", "confirm", "approve")
         )
-        self.assertEqual(spec.tracked(), ("note", "comment", "answer", "confirm", "approve"))
+        self.assertEqual(spec.tracked(), ("note", "comment", "answer", "approve"))  # a confirmation needs no reply (D8)
         self.assertEqual(fixture_spec(capabilities=()).sendable(), ("note",))
 
     def test_a_failing_data_handler_prints_the_traceback_with_skill_and_hash_and_answers_500_S46(self):
@@ -555,17 +555,54 @@ class ConversationTest(Fixture):
         self.assertEqual(target.read_text(), "")
 
 
-# What `pending` shows for an item beyond its state, by the name of the case in the table, as (item, field, value).
+# What `pending` shows for a thread beyond its state, by the name of the case in the table, as (thread, field, value).
 EXTRAS = {
     "an answer to a question the agent asked ends the wait": (
         "m1",
         "thread",
-        [{"from": "coordinator", "text": "t"}, {"from": "user", "text": "t"}],
+        [{"from": "coordinator", "id": "r1", "text": "t"}, {"from": "user", "id": "m2", "text": "t"}],
     ),
     "a comment sent again keeps its state, and is the same item": ("c2", "text", "edited"),
     "a reopened item is work again": ("c1", "reopened_because", "still wrong"),
-    "an answer to what a worker closed is an item": ("m1", "about", "worker-2 closed Q4 as answered"),
+    "an answer to what a worker closed is an item": ("x1", "about", "worker-2 closed Q4 as answered"),
+    "transition: you reopen a report the agent posted on its own": ("r1", "reopened_because", "why"),
 }
+TABLE = json.loads((HERE / "fixtures" / "threads.json").read_text())
+DEFAULT_KINDS = ("comment", "note")
+
+
+def shape(thread: dict) -> list:
+    return [thread["id"], thread["state"], thread["step"], thread.get("closed_by_user", thread.get("closedByUser"))]
+
+
+class ThreadsTest(unittest.TestCase):
+    def test_the_shared_table_of_logs_gives_each_thread_the_state_page_js_gives_it(self):
+        """The same logs are run on page.js `pageThreads` in tests/page.test.js: both give the same threads."""
+        for case in TABLE:
+            with self.subTest(case["name"]):
+                got = [
+                    t for t in page.threads(case["log"], tuple(case.get("items", DEFAULT_KINDS))) if not t["deleted"]
+                ]
+                self.assertEqual([shape(t) for t in got], [shape(t) for t in case["threads"]])
+                for thread, expected in zip(got, case["threads"], strict=True):
+                    if "since" in expected:
+                        self.assertEqual(thread["since"], expected["since"], thread["id"])
+
+    def test_a_thread_holds_its_messages_the_latest_form_of_its_first_one_and_your_latest_event(self):
+        log = [
+            {"type": "comment", "id": "c1", "n": 1, "text": "first", "by": "user"},
+            {"type": "reply", "id": "r1", "to": "c1", "text": "ok", "by": "coordinator"},
+            {"type": "note", "id": "m1", "to": "r1", "text": "more", "by": "user"},
+            {"type": "comment", "id": "c1", "n": 1, "text": "edited", "by": "user"},
+            {"type": "comment", "id": "c2", "n": 2, "text": "gone", "by": "user"},
+            {"type": "delete", "to": "c2", "by": "user"},
+        ]
+        c1, c2 = page.threads(log, DEFAULT_KINDS)
+        self.assertEqual(c1["root"]["text"], "edited")
+        self.assertEqual([m["id"] for m in c1["messages"]], ["c1", "r1", "m1"])
+        self.assertEqual(c1["user_at"], 2)
+        self.assertTrue(c2["deleted"])
+        self.assertEqual([e["id"] for e, _, _ in page.all_items(log, DEFAULT_KINDS, "coordinator")], ["c1"])
 
 
 class VerbsTest(Fixture):
@@ -573,7 +610,7 @@ class VerbsTest(Fixture):
         code_, out, err = self.cli("reply", self.unit_arg, stdin='It\'s done, "quoted" and `ticked`\n')
         self.assertEqual((code_, err), (0, ""))
         self.assertIn("Reply saved", out)
-        (event,) = self.log()
+        event = self.log()[0]  # then the report's own done status
         self.assertEqual(
             (event["type"], event["by"], event["text"], event["to"]),
             ("reply", "coordinator", 'It\'s done, "quoted" and `ticked`', None),
@@ -584,7 +621,9 @@ class VerbsTest(Fixture):
         code_, out, _ = self.cli("reply", self.unit_arg, "--to", "m1", stdin="ok")
         self.assertEqual(code_, 1)  # no such item
         self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
-        self.assertIn("Reply shown in the page.", self.cli("reply", self.unit_arg, "--to", "m1", stdin="ok")[1])
+        self.assertIn(
+            "Reply shown in the page.", self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="ok")[1]
+        )
         server.shutdown()
         server.server_close()  # the address file stays, as after a SIGKILL
         self.assertTrue((self.unit_dir / ".server").exists())
@@ -600,10 +639,12 @@ class VerbsTest(Fixture):
 
     def test_reply_to_an_item_sets_its_state_in_the_same_write_and_reply_state_is_shared(self):
         self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
-        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", stdin="Which size?")[0], 0)
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="Which size?")[0], 0)
         self.assertEqual([e["type"] for e in self.log()], ["note", "reply", "status"])
         self.assertEqual(self.log()[-1]["status"], "done")
-        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--state", "asked", stdin="More?")[0], 0)
+        self.assertEqual(
+            self.cli("reply", self.unit_arg, "--to", "m1", "--state", "asked", "--read", "0", stdin="More?")[0], 0
+        )
         self.assertEqual(self.log()[-1]["status"], "asked")
         code_, _, err = self.cli("reply", self.unit_arg, "--to", "nope", stdin="x")
         self.assertEqual(code_, 1)
@@ -612,7 +653,7 @@ class VerbsTest(Fixture):
 
     def test_status_marks_items_and_accepted_needs_the_users_words_on_stdin(self):
         self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
-        self.assertEqual(self.cli("status", self.unit_arg, "working", "m1")[0], 0)
+        self.assertEqual(self.cli("status", self.unit_arg, "working", "m1", "--read", "0")[0], 0)
         self.assertEqual(self.log()[-1]["status"], "working")
         code_, _, err = self.cli("status", self.unit_arg, "accepted", "m1")
         self.assertEqual(code_, 1)
@@ -636,7 +677,7 @@ class VerbsTest(Fixture):
         self.assertEqual(code_, 1)
         self.assertIn("m1 answers c1", err)
         before = len(self.log())
-        self.assertEqual(self.cli("status", self.unit_arg, "working", "m2")[0], 0)
+        self.assertEqual(self.cli("status", self.unit_arg, "working", "m2", "--read", "3")[0], 0)
         last = self.log()[before]
         self.assertEqual(
             (last["type"], last["to"], last["status"], last["by"]), ("status", "m2", "working", "coordinator")
@@ -647,9 +688,9 @@ class VerbsTest(Fixture):
     def test_status_closes_the_agents_own_message_but_not_a_reply_under_an_item(self):
         self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
         self.assertEqual(self.cli("reply", self.unit_arg, stdin="Which size?")[0], 0)
-        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", stdin="Done.")[0], 0)
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--read", "1", stdin="Done.")[0], 0)
         started, under = [e["id"] for e in self.log() if e["type"] == "reply"]
-        code_, out, _ = self.cli("status", self.unit_arg, "done", started)
+        code_, out, _ = self.cli("status", self.unit_arg, "done", started, "--read", "3")
         self.assertEqual(code_, 0, out)
         self.assertEqual(
             {k: self.log()[-1][k] for k in ("type", "to", "status")},
@@ -662,9 +703,18 @@ class VerbsTest(Fixture):
         self.assertEqual(len(self.log()), before)
 
     def test_pending_selects_deliverable_items_from_the_shared_table_of_logs(self):
-        """The page shows all open items. Pending only delivers states that need the agent in a fresh turn."""
-        table = json.loads((HERE / "fixtures" / "threads.json").read_text())
-        for case in table:
+        """The page shows every thread. Outside a page session, pending delivers the threads that are the agent's turn
+        and new, or seen only because the agent's --read covered them (no status of its own names them since: they may
+        never have been delivered), with the line to pass as --read. One the agent marked seen or working comes again
+        only in the turn after its own, or after a crash (S15)."""
+        seen_by_read = {
+            "seen: the agent's latest read covers your latest message in another thread",
+            "seen: each state shows when it started, and a status that changes nothing keeps it",
+            "stale: a stale status still counts as reading what came before",
+        }
+        for case in TABLE:
+            if "items" in case:
+                continue  # the fixture page tracks comments and notes, and approvals
             with self.subTest(case["name"]):
                 (self.unit_dir / "conversation.jsonl").unlink(missing_ok=True)
                 self.seed(*case["log"])
@@ -672,17 +722,162 @@ class VerbsTest(Fixture):
                 lines = out.splitlines()
                 self.assertEqual(code_, 0)
                 items = [event for event in map(json.loads, lines[:-1]) if "status" in event]
-                expected = [item for item in case["work"] if item[1] in ("new", "replied", "followup", "reopened")]
-                if case["name"] == "a comment sent again keeps its state, and is the same item":
-                    expected = [["c2", "new"]]  # an edit of a settled item is not delivered (S15)
+                expected = [
+                    [t["id"], t["step"]]
+                    for t in case["threads"]
+                    if t["state"] == "agent"
+                    and (t["step"] == "new" or (t["step"] == "seen" and case["name"] in seen_by_read))
+                ]
                 self.assertEqual([[e["id"], e["status"]] for e in items], expected)
-                self.assertEqual(lines[-1], f"{len(items)} not done.")
-                for name, (item, field, expected) in EXTRAS.items():
+                read = len(case["log"]) - 1
+                self.assertEqual(lines[-1], f"{len(items)} not done. Pass --read {read} to status and reply.")
+                for name, (item, field, value) in EXTRAS.items():
                     if name == case["name"]:
                         got = next(e[field] for e in items if e["id"] == item)
                         if field == "thread":
                             got = [{k: v for k, v in t.items() if k != "at"} for t in got]
-                        self.assertEqual(got, expected)
+                        self.assertEqual(got, value)
+
+    def test_a_status_read_is_a_whole_number_in_the_schema(self):
+        conv = page.Conversation(self.unit(), self.spec, self.docs)
+        base = {"type": "status", "at": "2026-11-28T10:00:00Z", "by": "coordinator", "to": "m1", "status": "seen"}
+        conv.check({**base, "read": 3})
+        for bad in ("3", -1, 1.5):
+            with self.subTest(read=bad), self.assertRaises(page.EventError):
+                conv.check({**base, "read": bad})
+
+    def test_a_report_carries_its_own_done_status_with_its_own_line_as_read_D13(self):
+        """A new report is done by the agent and stays in Open until the user's check; an old one, with no status, starts
+        closed (D13)."""
+        self.seed(
+            {"type": "note", "by": "user", "id": "m1", "text": "a", "to": None},
+            {"type": "reply", "by": "coordinator", "id": "r0", "text": "old report", "to": None},
+        )
+        self.assertEqual(self.cli("reply", self.unit_arg, stdin="Built it.")[0], 0)
+        report, status = self.log()[2:]
+        self.assertEqual(
+            (status["type"], status["to"], status["status"], status["read"]), ("status", report["id"], "done", 2)
+        )
+        shown = {t["id"]: (t["state"], t["closed_by_user"]) for t in page.threads(self.log(), DEFAULT_KINDS)}
+        self.assertEqual((shown["r0"], shown[report["id"]]), (("done", True), ("done", False)))
+
+    def test_an_acceptance_the_agent_records_is_not_the_user_writing_in_the_thread(self):
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "a", "to": None})
+        self.assertEqual(self.cli("status", self.unit_arg, "accepted", "m1", "--text", stdin="Looks right")[0], 0)
+        code_, _, err = self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="Thanks.")
+        self.assertEqual(code_, 0, err)
+
+    def test_reply_without_to_is_a_report_unless_asked_which_sets_asked_on_its_own_id_S6(self):
+        self.assertEqual(self.cli("reply", self.unit_arg, stdin="Built it.")[0], 0)
+        self.assertEqual([e["type"] for e in self.log()], ["reply", "status"])
+        self.assertEqual(self.cli("reply", self.unit_arg, "--state", "asked", stdin="Which size?")[0], 0)
+        question, status = self.log()[2:]
+        self.assertEqual((status["type"], status["to"], status["status"]), ("status", question["id"], "asked"))
+        states = [(t["state"], t["step"]) for t in page.threads(self.log(), DEFAULT_KINDS)]
+        self.assertEqual(states, [("done", "new"), ("you", "new")])
+
+    def test_the_agent_can_reply_to_and_mark_a_thread_it_started(self):
+        self.seed(
+            {"type": "reply", "by": "coordinator", "id": "r1", "text": "Which?", "to": None},
+            {"type": "closed", "by": "worker-2", "id": "x1", "question": "Q4", "status": "answered"},
+            {"type": "note", "by": "user", "id": "m1", "text": "this", "to": "r1"},
+        )
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "r1", "--read", "2", stdin="Done.")[0], 0)
+        self.assertEqual((self.log()[-1]["to"], self.log()[-1]["status"]), ("r1", "done"))
+        self.assertEqual(self.cli("status", self.unit_arg, "done", "x1", "--read", "4")[0], 0)
+
+    def last(self, thread_id):
+        return next(t for t in page.threads(self.log(), DEFAULT_KINDS) if t["id"] == thread_id)
+
+    def test_pending_prints_the_read_index_last_S2(self):
+        self.seed(
+            {"type": "note", "by": "user", "id": "m1", "text": "a", "to": None},
+            {"type": "reply", "by": "coordinator", "id": "r1", "text": "ok", "to": None},
+            {"type": "note", "by": "user", "id": "m2", "text": "b", "to": None},
+        )
+        code_, out, _ = self.cli("pending", self.unit_arg)
+        self.assertEqual(code_, 0)
+        self.assertEqual(out.splitlines()[-1], "2 not done. Pass --read 2 to status and reply.")
+        self.assertFalse((self.unit_dir / ".conversation-read").exists())  # no marker: the agent passes what it read
+
+    def test_status_and_reply_write_the_read_they_are_given_S2(self):
+        self.seed(
+            {"type": "note", "by": "user", "id": "m1", "text": "a", "to": None},
+            {"type": "note", "by": "user", "id": "m2", "text": "b", "to": None},
+        )
+        self.assertEqual(self.cli("status", self.unit_arg, "working", "m1", "m2", "--read", "1")[0], 0)
+        self.assertEqual([e.get("read") for e in self.log()[-2:]], [1, 1])
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--read", "3", stdin="Done.")[0], 0)
+        self.assertEqual((self.log()[-1]["status"], self.log()[-1]["read"]), ("done", 3))
+        self.assertEqual(self.last("m1")["state"], "done")
+
+    def test_status_and_reply_to_without_read_are_refused_and_write_nothing_S2(self):
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "a", "to": None})
+        for argv, stdin in (
+            (("status", self.unit_arg, "seen", "m1"), ""),
+            (("reply", self.unit_arg, "--to", "m1"), "x"),
+        ):
+            with self.subTest(argv[0]):
+                code_, _, err = self.cli(*argv, stdin=stdin)
+                self.assertEqual(code_, 1, err)
+                self.assertIn("--read", err)
+                self.assertIn("pending", err)
+                self.assertEqual(len(self.log()), 1)
+        # A new subject and the user's acceptance in words need no --read.
+        self.assertEqual(self.cli("reply", self.unit_arg, "--state", "asked", stdin="Which size?")[0], 0)
+        self.assertEqual(self.cli("reply", self.unit_arg, stdin="Built it.")[0], 0)
+        self.assertEqual(self.cli("status", self.unit_arg, "accepted", "m1", "--text", stdin="Fine by me")[0], 0)
+
+    def test_a_read_before_the_users_latest_event_in_a_named_thread_is_refused_and_names_it_S2(self):
+        self.seed(
+            {"type": "note", "by": "user", "id": "m1", "text": "a", "to": None},
+            {"type": "note", "by": "user", "id": "m2", "text": "b", "to": None},
+            {"type": "note", "by": "user", "id": "m3", "text": "more", "to": "m1"},
+        )
+        before = len(self.log())
+        for argv, stdin in (
+            (("status", self.unit_arg, "seen", "m1", "m2", "--read", "1"), ""),
+            (("reply", self.unit_arg, "--to", "m1", "--read", "1"), "Done."),
+        ):
+            with self.subTest(argv[0]):
+                code_, _, err = self.cli(*argv, stdin=stdin)
+                self.assertEqual(code_, 1, err)
+                self.assertIn("m1", err)
+                self.assertNotIn("m2", err)
+                self.assertIn("run pending", err)
+                self.assertIn("to read them, then send this again with the --read it prints", err)
+                self.assertEqual(len(self.log()), before)
+        # Only the named threads count: m2 has nothing newer than line 1.
+        self.assertEqual(self.cli("status", self.unit_arg, "seen", "m2", "--read", "1")[0], 0)
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--read", "2", stdin="Done.")[0], 0)
+        self.assertEqual(self.last("m1")["state"], "done")
+
+    def test_an_edited_comment_and_a_note_under_the_agents_reply_are_writes_in_the_thread_S2(self):
+        self.seed(
+            {"type": "comment", "by": "user", "id": "c1", "n": 1, "text": "big"},
+            {"type": "reply", "by": "coordinator", "id": "r1", "text": "ok", "to": "c1"},
+            {"type": "comment", "by": "user", "id": "c1", "n": 1, "text": "bigger"},
+        )
+        code_, _, err = self.cli("status", self.unit_arg, "done", "c1", "--read", "1")
+        self.assertEqual(code_, 1, err)
+        self.assertIn("c1", err)
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "and red", "to": "r1"})
+        code_, _, err = self.cli("reply", self.unit_arg, "--to", "c1", "--read", "2", stdin="Done.")
+        self.assertEqual(code_, 1, err)
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "c1", "--read", "3", stdin="Done.")[0], 0)
+
+    def test_a_read_past_the_log_or_not_a_whole_number_is_refused(self):
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "a", "to": None})
+        code_, _, err = self.cli("status", self.unit_arg, "seen", "m1", "--read", "5")
+        self.assertEqual(code_, 1, err)
+        self.assertIn("no line 5", err)
+        self.assertEqual(self.cli("status", self.unit_arg, "seen", "m1", "--read", "-1")[0], 2)
+        self.assertEqual(self.cli("status", self.unit_arg, "seen", "m1", "--read", "x")[0], 2)
+        self.assertEqual(len(self.log()), 1)
+
+    def test_status_help_says_it_marks_threads(self):
+        code_, out, _ = self.cli("--help")
+        self.assertNotIn("mark the user's items", out)
 
     def test_a_skill_without_a_page_refuses(self):
         with mock.patch.object(page, "PAGES", {}):

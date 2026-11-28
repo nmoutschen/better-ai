@@ -71,7 +71,7 @@ def load(unit: Unit, run: cli.Run) -> Discovery:
     def read(relative: str) -> list[dict]:
         done = schema.read_records(unit, relative, docs, cache, now, cutoff, keep_invalid=True)
         found.errors.extend(done.errors)
-        return done.records
+        return page.log_records(done) if relative == page.LOG else done.records  # the log keeps its lines
 
     head = read(unit.kind.head)
     found.head = head[0] if head else {}
@@ -386,7 +386,7 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
     }
     for event, state, extra in events.found:
         ident = event["id"]
-        if state == "done" and ident not in pointed and not events.answered(extra):
+        if state == "done" and not extra.get("closed_by_user") and ident not in pointed and not events.answered(extra):
             found.append(
                 Warning_(
                     "done-event-unanswered",

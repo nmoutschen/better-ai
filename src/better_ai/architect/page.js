@@ -222,9 +222,9 @@ function threadComment(log, id) {
 function start(data) {
   const view = $('.view');
   const readOnly = !!data.static;  // a copy written by `render`: nothing can be sent
+  // The figures: sections accepted, open comments, and page.js's "N your turn" figure in #yourturn.
   byId('status').innerHTML = '<span class="stat"><b id="accepted-count"></b>sections accepted</span>' +
-    '<span class="stat"><b id="comment-count">0</b>open comments</span>' +
-    '<button type="button" class="stat" id="questions"><b id="question-count">0</b>open questions</button>';
+    '<span class="stat"><b id="comment-count">0</b>open comments</span><span class="yourturn" id="yourturn"></span>';
   const versions = data.versions || [];
   const alternatives = data.alternatives || [];
   const before = versions.length < 2;  // the design draws only the system as it is: nothing to approve yet
@@ -238,9 +238,8 @@ function start(data) {
   const applicable = perspectives.filter(p => p.applies);
   const reviewIds = data.rerun;
   const reviewNames = reviewIds.map(id => nameOf(perspectives, id));
-  const items = ['comment', 'note', 'approve', 'confirm'];
-  const waiting = (entry, states) => (entry.items || []).some(id => states[id] === 'asked') ||
-    (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.type === 'note'));
+  // The user's kinds the architect replies to; a confirmation needs no reply, and its thread starts closed (D8).
+  const items = ['comment', 'note', 'approve'];
   const revKey = 'architecture-page';
   const saved = JSON.parse(sessionStorage.getItem(revKey) || '{}');
   sessionStorage.removeItem(revKey);
@@ -250,7 +249,9 @@ function start(data) {
   let commentsById = new Map();
   const partByElement = new Map();
   const openComments = byId('comment-count');
-  const openQuestions = byId('question-count');
+  // The comment threads the user has not closed, from the one state machine (pageThreads).
+  const openCommentThreads = () => pageThreads(conversation.log(), items)
+    .filter(t => t.root.type === 'comment' && !t.deleted && !t.closedByUser);
 
   function section(key, heading, content) {
     panel(key).innerHTML = '<h2>' + text(heading) + '</h2>' + content;
@@ -441,7 +442,7 @@ function start(data) {
   }
 
   const conversation = pageConversation({
-    served: !readOnly, readOnly, itemKinds: items, latestLast: true, waiting,
+    served: !readOnly, readOnly, itemKinds: items, stats: () => byId('yourturn'),
     kinds: {approve: entry => pageApprovalItem(entry, conversation.log()), confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
     byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
@@ -450,14 +451,12 @@ function start(data) {
     beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, overlay, scroll: view.scrollTop})),
     rendered: states => {
       const log = conversation.log();
-      const model = pageThread(log, items, waiting, true);
-      const open = model.open.filter(entry => entry.kind === 'comment');
-      commentsById = new Map(model.entries.filter(entry => entry.kind === 'comment' && !entry.deleted)
-        .map(entry => [entry.e.id, entry.e]));
+      const threads = pageThreads(log, items).filter(t => t.root.type === 'comment' && !t.deleted);
+      const open = threads.filter(t => !t.closedByUser);
+      commentsById = new Map(threads.map(t => [t.id, t.root]));
       openComments.textContent = open.length;
-      openQuestions.textContent = pageOpenDecisions([], log, items, waiting).length + pageApprovals().length;
       const counts = new Map();
-      for (const {e} of open) {
+      for (const {root: e} of open) {
         const key = locate(e)?.closest('[role="tabpanel"]')?.id.slice(6);
         counts.set(key, (counts.get(key) || 0) + 1);
       }
@@ -588,13 +587,6 @@ function start(data) {
   pop.addEventListener('keydown', event => { if (event.key === 'Escape') commentLayer.close(); });
   window.addEventListener('resize', placePins);
 
-  byId('questions').addEventListener('click', () => {
-    if (pageOpenApproval()) return;
-    const model = pageThread(conversation.log(), items, waiting, true);
-    const entry = model.entries.find(c => !c.deleted && waiting(c, model.state));
-    if (entry) showConversation(entry.e.id);
-  });
-
   // Approve…: page.js's panel, as on design-better's canvas. Before a review: one option per alternative, or Ship After
   // and Keep Before; after one, Review again… while a perspective has changes to review.
   function approvalOptions() {
@@ -616,8 +608,7 @@ function start(data) {
     changes.innerHTML = review ? changeList(data.since, data.change_labels, removed) : '';
     box.append(summary, changes);
   }
-  const openItems = () => pageThread(conversation.log(), items, waiting, true).open
-    .filter(entry => entry.kind === 'comment' && !entry.deleted).map(entry => ({id: entry.e.id, n: entry.e.n, text: entry.e.text}));
+  const openItems = () => openCommentThreads().map(t => ({id: t.id, n: t.root.n, text: t.root.text}));
   if (!readOnly && !before && !(review && !reviewNames.length)) {
     approval = pageApprovalPanel({conversation, options: approvalOptions, openItems, intro: approvalIntro,
       button: review ? 'Review again…' : 'Approve…', params: () => ({again: !!review, perspectives: reviewIds, changes: data.since}),

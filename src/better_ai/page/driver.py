@@ -943,6 +943,7 @@ class Driver:
             ],
             marked,
             batch.position,
+            batch.read,
         )
         paths.write_atomic(
             self.unit,

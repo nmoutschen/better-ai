@@ -644,20 +644,22 @@ class Architect(unittest.TestCase):
                 "text": "Design approved",
             }
         )
-        self.assertIn('"id": "A1"', self.command("pending"))
-        self.assertIn("Marked working: A1", self.command("status", "working", "A1"))
-        self.command("reply", "--to", "A1", "--state", "working", stdin="Checking the server.")
+        listed = self.command("pending")
+        self.assertIn('"id": "A1"', listed)
+        read = listed.split("--read ")[1].split()[0]  # the line pending read up to, which the agent passes (D12)
+        self.assertIn("Marked working: A1", self.command("status", "working", "A1", "--read", read))
+        self.command("reply", "--to", "A1", "--state", "working", "--read", read, stdin="Checking the server.")
         self.assertNotIn('"id": "A1"', self.command("pending"))
         (item,) = self.conversation().delivery(recover_ids=frozenset({"A1"})).items
         self.assertEqual(item["status"], "working")
         self.assertEqual(item["thread"][0]["text"], "Checking the server.")
-        self.command("status", "done", "A1")
+        self.command("status", "done", "A1", "--read", read)
         self.assertEqual(self.conversation().delivery(recover_ids=frozenset({"A1"})).items, [])
 
     def test_the_page_declares_the_capabilities_its_events_need(self):
         spec = page.spec_of(self.unit.skill)
         self.assertEqual(set(spec.capabilities), {"pins", "accept", "confirm", "approve"})
-        self.assertEqual(set(spec.tracked()), {"note", "comment", "confirm", "approve"})
+        self.assertEqual(set(spec.tracked()), {"note", "comment", "approve"})  # a confirmation needs no reply (D8)
         self.assertEqual(spec.events, "architect-events.schema.json")
         self.assertEqual(spec.agent, "architect")
 

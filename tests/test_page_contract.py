@@ -122,6 +122,8 @@ PAGES = {
             "note": NOTE,
             "answer": {"id": "a-x", "decision": "D1", "text": "Business days only.", "default": False},
             "comment": {"id": "c-x", "text": "why?", "on": {"kind": "agent", "id": "b1", "title": "b1"}},
+            "accept": {"to": "a-x"},
+            "reopen": {"to": "a-x", "text": "still wrong"},
         },
     ),
     "research-better": (
@@ -130,6 +132,8 @@ PAGES = {
             "note": NOTE,
             "answer": {"id": "a-x", "decision": "D1", "text": "go on", "default": False},
             "comment": {"id": "c-x", "text": "why?", "on": {"kind": "question", "id": "Q-w2-4", "title": "t"}},
+            "accept": {"to": "a-x"},
+            "reopen": {"to": "a-x", "text": "still wrong"},
         },
     ),
     "discover-better": (
@@ -138,14 +142,16 @@ PAGES = {
             "note": NOTE,
             "answer": {"id": "a-x", "decision": "D1", "text": "Run the probe", "default": False},
             **discover_records.EVENTS,
+            "accept": {"to": "a-x"},
+            "reopen": {"to": "a-x", "text": "still wrong"},
         },
     ),
 }
 
 
-# A method the page declares but its events schema does not list yet (a bug, reported to the coordinator: the architect
-# page's accept capability sends `reopen`, which the schema refuses). The test expects the refusal until it is fixed.
-UNSAVED = {"architect-better": {"reopen"}}
+# A method the page declares but its events schema does not list yet: the test expects the refusal until it is fixed.
+# None now: the architect's schema lists `reopen` (T4).
+UNSAVED: dict[str, set[str]] = {}
 
 
 def rpc(url: str, method: str, params: dict, token: str) -> dict:
@@ -192,8 +198,9 @@ class PageContract(unittest.TestCase):
                 self.assertEqual(log.read_text(), saved)
                 better.stop_page(folder)  # the unit has its own agent while it is served: it is the agent's now
                 self.assertFalse((folder / ".server").exists())
+                last = str(len(log.read_text().splitlines()) - 1)  # the agent read the whole log (D12)
                 for verb, extra, text in (
-                    ("reply", ["--to", "m-x"], "seen it"),
+                    ("reply", ["--to", "m-x", "--read", last], "seen it"),
                     ("status", ["accepted", "m-x", "--text"], "fine"),
                     ("pending", [], None),
                 ):  # the agent's side, with this skill's events schema

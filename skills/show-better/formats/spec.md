@@ -10,13 +10,13 @@ python3 <skill dir>/scripts/better.pyz render .show/SLUG
 python3 <skill dir>/scripts/better.pyz render .show/SLUG --format text
 python3 <skill dir>/scripts/better.pyz render .show/SLUG --format md
 python3 <skill dir>/scripts/better.pyz serve .show/SLUG
-python3 <skill dir>/scripts/better.pyz reply .show/SLUG --to ID
-python3 <skill dir>/scripts/better.pyz status .show/SLUG seen|asked|working|done ID...
+python3 <skill dir>/scripts/better.pyz reply .show/SLUG --to ID --read N
+python3 <skill dir>/scripts/better.pyz status .show/SLUG seen|asked|working|done ID... --read N
 python3 <skill dir>/scripts/better.pyz status .show/SLUG accepted ID... --text
 python3 <skill dir>/scripts/better.pyz pending .show/SLUG
 ```
 
-`create` and `set` take the spec on stdin, `reply` and `status --text` the words on stdin. `check` names each wrong field as `panels[2].items[0].value: required`.
+`create` and `set` take the spec on stdin, `reply` and `status --text` the words on stdin. `--read N` is the line of the last event you read: the number on the last line of `pending` or of the turn's prompt. `check` names each wrong field as `panels[2].items[0].value: required`.
 
 Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). `--format text --screen-reader` prints each slide as sentences and value lists, without box lines, bars, rules or symbols. In text output, an `svg` visual shows only its `alt`.
 

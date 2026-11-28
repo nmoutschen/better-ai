@@ -18,7 +18,8 @@ prompt's header names as approved without asking: the interpreter, the archive a
 it. STUB_RESULT is the file that gets one JSON line for each answer: its behavior, its message and the exit code of the
 command, which runs when it is allowed.
 STUB_HANDLE, if set, makes the stub do what a page agent does with the items of a prompt: it runs `status <unit> done
-<id>` for each item whose status is new, so that the driver sees the work done. Its value is the JSON list of the
+<id> --read <n>` for each item whose status is new, with the --read the prompt's last line gives, so that the driver sees
+the work done. Its value is the JSON list of the
 command that runs a better verb, such as the interpreter and the archive.
 STUB_LOG, if set, is a file the stub appends its process id, its BETTER_PAGE_SESSION and its command line to.
 """
@@ -83,15 +84,24 @@ def run_commands(message):
             result.write(json.dumps(answer) + "\n")
 
 
+def read_line(prompt):
+    """The line the prompt's last line says to pass as --read, as `pending` prints it, or None."""
+    for line in prompt.splitlines():
+        if " not done. Pass --read " in line:
+            return line.split(" Pass --read ", 1)[1].split()[0]
+    return None
+
+
 def handle_items(message):
     """STUB_HANDLE is the JSON list of the command that runs a verb (the source tree's, or an archive's)."""
-    unit = header_form(prompt_text(message))[2]
-    for line in prompt_text(message).splitlines():
+    prompt = prompt_text(message)
+    unit, read = header_form(prompt)[2], read_line(prompt)
+    for line in prompt.splitlines():
         if line.startswith("{"):
             record = json.loads(line)
             if record.get("status") == "new" and record.get("id"):
                 argv = [*json.loads(os.environ["STUB_HANDLE"]), "status", shlex.split(unit)[0], "done", record["id"]]
-                subprocess.run(argv, capture_output=True, check=False)
+                subprocess.run([*argv, *(["--read", read] if read else [])], capture_output=True, check=False)
 
 
 def session_of(argv):

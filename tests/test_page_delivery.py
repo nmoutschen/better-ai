@@ -73,7 +73,7 @@ class DeliveryTest(shell.Fixture):
         )
         with mock.patch.dict(os.environ, {"BETTER_PAGE_SESSION": "unrelated"}):
             code, out, err = self.cli("pending", self.unit_arg)
-        self.assertEqual((code, out, err), (0, "0 not done.\n", ""))
+        self.assertEqual((code, out, err), (0, "0 not done. Pass --read 3 to status and reply.\n", ""))
 
     def test_driver_pending_keeps_exact_turn_after_late_user_input(self):
         from test_page_driver import Peer
@@ -108,9 +108,10 @@ class DeliveryTest(shell.Fixture):
         with mock.patch.dict(os.environ, {"BETTER_PAGE_SESSION": driver.tag}):
             code, out, err = self.cli("pending", self.unit_arg)
         self.assertEqual((code, err), (0, ""))
-        records = list(map(json.loads, out.splitlines()[:-1]))
+        records = [{k: v for k, v in r.items() if k != "since"} for r in map(json.loads, out.splitlines()[:-1])]
         expected = [{**item, "status": {0: "working", 1: "seen"}.get(n, "new")} for n, item in enumerate(sent[:-1])]
         self.assertEqual(records, [*expected, sent[-1]])
+        self.assertEqual(out.splitlines()[-1], f"21 not done. Pass --read {len(sent) - 1} to status and reply.")
 
     def test_an_rpc_edit_reaches_pending_only_while_the_item_is_not_settled(self):
         _, host = self.serve()
@@ -121,7 +122,10 @@ class DeliveryTest(shell.Fixture):
                 "saved",
             )
         for number, state in enumerate([*states, "working"], 1):
-            self.assertEqual(self.cli("status", self.unit_arg, state, f"c{number}", "--text", stdin="Agreed")[0], 0)
+            read = ["--read", str(len(self.log()) - 1)] if state != "accepted" else []  # what the agent read (D12)
+            self.assertEqual(
+                self.cli("status", self.unit_arg, state, f"c{number}", "--text", *read, stdin="Agreed")[0], 0
+            )
         for number, state in enumerate(states, 1):
             self.assertEqual(
                 self.rpc(host, "comment", {"id": f"c{number}", "n": number, "on": {}, "text": f"edited {state}"}).get(

@@ -340,10 +340,11 @@ class Served(unittest.TestCase):
         self.assertEqual(self.send("comment", thumbs).get("result"), "saved")  # a verdict alone is a comment
 
     def test_a_message_the_agent_posts_without_to_can_be_closed_with_status(self):
-        """Issue #120: such a message waited at the bottom of the page for good. page.test.js checks it leaves Open."""
+        """Issue #120: such a message waited at the bottom of the page for good. A report now carries its own done status
+        (D13), and the agent can still mark it done with status."""
         self.assertEqual(run(self.root, "reply", ".design/pay", stdin="Which size first?").returncode, 0)
         started = next(e["id"] for e in self.log() if e["type"] == "reply")
-        done = run(self.root, "status", ".design/pay", "done", started)
+        done = run(self.root, "status", ".design/pay", "done", started, "--read", "0")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual((self.log()[-1]["type"], self.log()[-1]["to"]), ("status", started))
 

@@ -208,23 +208,16 @@ function commentBody(e) { return pageMarkdown(e.text); }
 const kinds = {closed: closedItem};
 const conv = pageConversation({
   served: !SNAPSHOT, readOnly: !!SNAPSHOT, stream: false, name: "board", agent: "Coordinator", thread: $("thread"),
-  agentKinds: ["reply", "closed"], kinds, crumb, commentBody,
-  // No working or accept step on the board: the coordinator answers most messages from the board at once, and an
-  // answered item is finished.
-  steps: ["seen", "done"], labels: {done: "Answered"}, shown: st => st === "working" ? "seen" : st === "accepted" ? "done" : st,
-  accept: false, filter: false,
-  // A decision waiting for the user comes last, next to the message box, until they answer it; so does a message of
-  // theirs that the coordinator asked about.
-  waiting: (c, state) => c.kind === "decision" ? decision.waiting(c, state) : (c.items || []).some(id => state[id] === "asked"),
+  kinds, crumb, commentBody, stats: () => $("yourturn"),
   afterSend: () => tick(),
 });
 const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 // The decision question is the shared one: default, deadline, Use the default, Answer.
 const decision = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});
 kinds.decision = decision.item;
-// The decisions waiting for the user, by the rule every page shares: asked and not yet answered on the page, or asked
-// back about the answer.
-const waitingCount = d => pageOpenDecisions(decisions(d), d.conversation).length + pageApprovals().length;
+// The decisions waiting for the user, by the one state machine every page shares (pageThreads): asked and not yet
+// answered on the page, or asked back about the answer. The deadlines count down while one waits.
+const waitingCount = d => pageOpenDecisions(decisions(d), d.conversation).length;
 
 // ---------- The right column ----------
 function drawAgents(d) {
@@ -331,8 +324,6 @@ document.addEventListener("submit", ev => {
 document.addEventListener("click", ev => {
   const t = ev.target;
   if (t.closest("#goal")) { $("goal").classList.toggle("open"); return; }
-  if (t.closest("#to-waiting")) { if (pageOpenApproval()) return; const q = document.querySelector("#thread .open-q"); if (!q) return;
-    q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
   if (pop.click(t)) return;
   const g = t.closest(".map .q"); if (g) return openPop("question", g.dataset.q, g);
   const a = t.closest("[data-a]"); if (a) return openPop("agent", a.dataset.a, a);
@@ -367,7 +358,8 @@ function render(d) {
   setHTML($("status"), `<span class="stat"><b>${answered}<span class="of"> / ${qs.length}</span></b>questions closed
       <span class="meter" aria-hidden="true"><i style="width:${qs.length ? (100 * answered / qs.length).toFixed(0) : 0}%"></i></span></span>`
     + (live ? stat(workers, workers === 1 ? "worker on questions" : "workers on questions") + (answered >= 3 && left ? stat(leftText, "left at this pace") : "") : "")
-    + (waitingN && !CLOSED_PAGE ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "decision waiting for you" : "decisions waiting for you"}</button>` : "") + phase);
+    + `<span class="yourturn" id="yourturn"></span>` + phase);  // page.js's "N your turn" figure
+  conv.figure();
   const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, q._errors && q._errors[0], OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
   const replies = (d.conversation || []).filter(e => e.type === "reply");

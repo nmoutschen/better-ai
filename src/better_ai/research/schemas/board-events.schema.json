@@ -7,7 +7,7 @@
   "x-versioned": true,
   "type": "object",
   "properties": {
-    "type": {"enum": ["comment", "note", "answer", "reply", "status", "accepted", "closed"]}
+    "type": {"enum": ["comment", "note", "answer", "accept", "reopen", "reply", "status", "accepted", "closed"]}
   },
   "allOf": [
     {

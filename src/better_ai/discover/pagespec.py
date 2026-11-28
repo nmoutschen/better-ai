@@ -56,7 +56,7 @@ def load(unit: Unit) -> dict:
     def read(relative: str) -> list[dict]:
         done = schema.read_records(unit, relative, docs, cache, now, cutoff, keep_invalid=True)
         errors.extend(done.errors)
-        return done.records
+        return page.log_records(done) if relative == page.LOG else done.records  # the log keeps its lines
 
     head = read(unit.kind.head)
     found: dict[str, Any] = {attribute: read(name) for name, attribute in RECORD_FILES}
@@ -151,7 +151,7 @@ SPEC = page.register(
         assets={"/discover.css": "discover/page.css", "/discover.js": "discover/page.js"},
         css=("/discover.css",),
         js=("/discover.js",),
-        capabilities=("decisions",),
+        capabilities=("decisions", "accept"),  # every thread can be closed and reopened
         methods=summary.PAGE_EVENTS,
         items=("note", "answer", *summary.PAGE_EVENTS),
         empty="Nothing yet. Answer a question, add evidence, or write to the coordinator below.",

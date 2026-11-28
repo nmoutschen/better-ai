@@ -206,5 +206,7 @@ def static_data(unit: Unit, run: cli.Run) -> dict:
         run.err(f"warning: {len(payload['errors'])} records are not valid: run check {unit.label}")
     run.out(f"wrote {len(files)} SVGs in {unit.label}/{RENDER_FOLDER}")
     spec = page.spec_of(run.skill)
-    events = page.Conversation(unit, spec, page.load_docs(run.skill)).events()
-    return {**payload, "events": [e for e in events if e], "static": True}
+    events = page.Conversation(
+        unit, spec, page.load_docs(run.skill)
+    ).logged()  # with their lines, which `read` counts in
+    return {**payload, "events": events, "static": True}

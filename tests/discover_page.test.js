@@ -12,7 +12,7 @@ const ago = minutes => new Date((NOW - minutes * 60) * 1000).toISOString().slice
 
 function pure(returns, over = {}) {
   const env = Object.assign({
-    document: stand(), pageEscape: shared.pageEscape, pageThread: shared.pageThread, pageDecisionEvents: shared.pageDecisionEvents, pageOpenDecisions: shared.pageOpenDecisions,
+    document: stand(), pageEscape: shared.pageEscape, pageThreads: shared.pageThreads, pageDecisionEvents: shared.pageDecisionEvents, pageOpenDecisions: shared.pageOpenDecisions,
     pageDecision: shared.pageDecision, pageAgents: shared.pageAgents, pageApprovals: shared.pageApprovals, pageOpenApproval: shared.pageOpenApproval, pageTime: shared.pageTime,
     pageMarkdown: t => ({ outerHTML: '<p>' + shared.pageEscape(t) + '</p>' }), pageMarkdownText: String,
   }, over);
@@ -86,7 +86,7 @@ test('S80: the header, the badges and the conversation count open questions thro
   assert.equal(badges.problems, 1);
   assert.equal(badges.behaviours, 1);  // D2 is about a risk of B1
   assert.equal(badges.opportunities || 0, 0);  // D4 is answered
-  assert.match(a.headerHTML(d, open), /<b>3<\/b>open questions/);
+  assert.match(a.headerHTML(d), /<span class="yourturn" id="yourturn"><\/span>/);  // page.js's figure counts the threads that are your turn
 });
 
 test('S1, A2: an answer from the page drops the question from the header, the Moves badge and the item badge together; so does an answer in the chat', () => {
@@ -107,24 +107,24 @@ test('A2: a tab with open questions has a badge with an accessible name; with no
   assert.equal(a.tabLabel('Problems', 0), 'Problems');
 });
 
-test('S106: 0 open questions is a plain figure, not a button; with some, the figure is a button that goes to the first', () => {
+test('S106: the header has one figure for what waits for you: the shared "N your turn" (page.js), in the slot it leaves, never its own', () => {
   const a = api(), d = fixture();
-  const none = a.headerHTML(d, []);
-  assert.match(none, /<b>0<\/b>open questions/);
-  assert.doesNotMatch(none, /<button[^>]*>\s*<b>0/);
-  assert.match(a.headerHTML(d, [d.decisions[0]]), /<button type="button" class="stat" id="questions"><b>1<\/b>open question<\/button>/);
+  const html = a.headerHTML(d);
+  assert.equal((html.match(/id="yourturn"/g) || []).length, 1);
+  assert.doesNotMatch(html, /open question|id="questions"/);
+  assert.match(source, /stats: \(\) => byId\('yourturn'\)/);
 });
 
-test('S2: the header holds figures only: the step of ten, the brief version and the open questions; never a sentence', () => {
+test('S2: the header holds figures only: the step of ten, the brief version and the threads that are your turn; never a sentence', () => {
   const a = api(), d = fixture({
     moves: [rec('move', { id: 'M1', option: 'K2', step: '3', why: 'Owners first.', answer: { type: 'page', event: 'c1' } })], chosen: 'K2',
     briefs: [rec('brief', { id: 'v1', move: 'M1', status: 'draft' })],
   });
-  const html = a.headerHTML(d, []);
+  const html = a.headerHTML(d);
   const stats = [...html.matchAll(/<b>(.*?)<\/b>([^<]*)/g)].map(m => [m[1].replace(/<[^>]+>/g, ''), m[2]]);
-  assert.deepEqual(stats, [['5 / 10', 'step'], ['v1', 'brief'], ['0', 'open questions']]);
+  assert.deepEqual(stats, [['5 / 10', 'step'], ['v1', 'brief']]);  // and the shared "N your turn" figure, in its slot
   assert.doesNotMatch(html, /Owners only|your calls|being written|last move/);
-  assert.match(a.headerHTML(fixture(), []), /<b>–<\/b>brief/);  // no brief yet: a dash, not a sentence
+  assert.match(a.headerHTML(fixture()), /<b>–<\/b>brief/);  // no brief yet: a dash, not a sentence
   assert.equal(a.briefLabel(fixture({ moves: d.moves, briefs: [rec('brief', { id: 'v1', move: 'M1', status: 'final' })] })), 'v1, final');
   assert.equal(a.briefLabel(fixture()), 'no brief yet');
 });
@@ -353,7 +353,7 @@ test('S6, A22: a question about a risk sits in its State cell with the question,
   assert.match(r1, /<a href="#row-D2" data-goto="D2">D2<\/a>: Will you build B1 without knowing whether people read it\?/);
   assert.doesNotMatch(r1, /It may be noise/);
   assert.match(r1, /Suggested default: Accept the risk/);
-  assert.match(r1, /data-use="D2" aria-label="Use the default for D2">✓</);
+  assert.match(r1, /class="btn btn--sm btn--quiet answer" data-use="D2" aria-label="Use the default for D2">Use the default</);  // D11: ✓ only ever closes
   assert.match(r1, /data-answer="D2" aria-label="Answer D2">Answer</);
 });
 
@@ -542,7 +542,7 @@ test('A5: the page\'s own controls use five verbs, plus Send and Cancel, and the
   const forms = a.addEvidenceForm(d) + a.resultForm(d.tests[0]) + a.removeForm(d.items[0], d.head) + a.changeForm('item', 'P1');
   const labels = buttonLabels(html + forms);
   assert.ok(labels.length > 10);
-  const allowed = /^(Add|Change|Remove|Answer|Choose|Send|Cancel|✓)/;
+  const allowed = /^(Add|Change|Remove|Answer|Choose|Send|Cancel|Use the default|✓)/;  // D11: the default is used with words, not a bare check
   for (const label of labels) assert.match(label, allowed, label);
   assert.ok(labels.includes('Choose a move…'), 'the exit action reads Choose a move…');
   assert.doesNotMatch(html, /Reopen|Edit|Delete|Update|Save|Submit|Create|Approve|Reply/);
@@ -615,3 +615,49 @@ test('L2: Waiting for the agent is the agent working: a working chip, never the 
 });
 
 test('the unused stale-minutes constant is gone', () => { assert.doesNotMatch(source, /STALE_MINUTES/); });
+
+// ---- The page's own kinds inside the rows of the shared panel (S24, S25): page.js of discover runs whole on the
+// stand-in shell (tests/dom.js), with the shared page.js's real panel.
+const { shellDocument, mixedDocument, panelOn, text, actions } = require('./dom');
+function liveDiscover(data) {
+  const doc = shellDocument(), view = doc.createElement('main');
+  view.className = 'view'; doc.body.append(view);  // the page's forms open in its view: none is open
+  const live = panelOn(null, null, { document: doc, config: { agent: 'coordinator', capabilities: ['decisions'] } });
+  const c = live.context, env = {
+    document: mixedDocument(doc), pageConversation: o => c.pageConversation(Object.assign({}, o, { served: false })),
+    pageDecision: c.pageDecision, pageDecisionEvents: c.pageDecisionEvents, pageOpenDecisions: c.pageOpenDecisions, pageThreads: c.pageThreads,
+    pageMarkdown: c.pageMarkdown, pageMarkdownText: c.pageMarkdownText, pageTime: c.pageTime, pageEscape: c.pageEscape,
+    pageAgents: c.pageAgents, pageShowErrors: () => {}, pageFetch: () => new Promise(() => {}), setInterval: () => {},
+    addEventListener: () => {}, innerWidth: 1000, innerHeight: 800, getComputedStyle: stand(), CSS: { escape: s => s },
+  };
+  const page = new Function(...Object.keys(env), source + '; return {paint, conv, setData: d => { DATA = d; }};')(...Object.values(env));
+  page.setData(data);
+  page.paint();
+  return Object.assign(live, page);
+}
+
+test('the page draws its kinds inside rows: a decision as your turn with its default and controls, a choose as your message', () => {
+  const d = fixture({ conversation: [{ type: 'choose', id: 'ch1', option: 'K2', revision: 'r2', at: ago(2), by: 'user' }] });
+  const p = liveDiscover(d);
+  const d1 = p.rowOf('D1'), ch = p.rowOf('ch1');
+  assert.equal(text(d1.querySelector('.chip')), 'Your turn');
+  assert.equal(text(d1.querySelector('.tgist')), 'Coordinator: Is P1 the main problem?');
+  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Use the default', 'Answer']);
+  d1.querySelector('.thead').click();
+  assert.match(text(p.rowOf('D1').querySelector('.tbody')), /Suggested default: Yes/);
+  assert.equal(text(ch.querySelector('.chip')), 'Agent’s turn');
+  assert.match(text(ch.querySelector('.tgist')), /^You: Chose Shrink: Owners only\./);
+  assert.deepEqual(actions(ch).map(x => x.textContent), ['✓', 'Reply']);
+  assert.equal(text(p.$('#status #yourturn')), '3 your turn');
+});
+
+test('answering a decision from its row records the answer; the figure counts one fewer', () => {
+  const p = liveDiscover(fixture());
+  actions(p.rowOf('D1'))[2].click();
+  const box = p.rowOf('D1').querySelector('.why textarea');
+  box.input('No, P2 is.');
+  box.key('Enter', { ctrlKey: true });
+  assert.deepEqual(p.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'No, P2 is.', false]]);
+  assert.equal(text(p.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
+  assert.equal(text(p.$('#status #yourturn')), '2 your turn');
+});
