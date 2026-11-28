@@ -325,3 +325,38 @@ class AnsweredTest(shell.Fixture):
         )
         batch = conv.delivery(after=2)
         self.assertEqual([e["id"] for e in batch.events], ["r1-more"])
+
+    def test_the_driver_does_not_send_again_a_note_the_agent_read_and_answered(self):
+        from test_page_driver import Event, Peer, eventually
+
+        from better_ai.page.driver import Driver
+
+        conv = shell.page.Conversation(self.unit(), self.spec, self.docs)
+        self.seed(note("m1"))
+        peer = Peer()
+        driver = Driver(
+            conv,
+            "stub",
+            lambda *_: peer,
+            skill_path="SKILL.md",
+            command="better.pyz",
+            cwd=self.unit_dir,
+            valid_session=lambda key: key == "session-1",
+        )
+        self.addCleanup(driver.close)
+        driver.tab_paired()
+        driver.start()
+        self.assertTrue(peer.prompt_arrived.wait(2))
+        self.seed(note("m1-more", to="m1"))
+        driver.enqueue(self.log()[-1])  # as the page's server enqueues it: the event as written
+        # The agent reads it through pending in its session, and answers it in the same turn.
+        read = len(self.log()) - 1
+        self.seed({"type": "reply", "by": "coordinator", "id": "a1", "to": "m1", "text": "Done."})
+        self.seed({**status("m1", "done"), "read": read})
+        self.seed(note("m2"))
+        driver.enqueue(self.log()[-1])
+        eventually(lambda: "m2" in driver._admitted_items)
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        eventually(lambda: len(peer.prompts) == 2)
+        self.assertIn('"id": "m2"', peer.prompts[1])
+        self.assertNotIn("m1-more", peer.prompts[1])
