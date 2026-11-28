@@ -946,5 +946,132 @@ class RoundTwoTests(Case):
         self.assertEqual(delivered_position({"id": "zzz", "position": 1}, events), 1)
 
 
+class RoundThreeTests(Case):
+    def write_log(self, *records):
+        (self.root / ".driver.log").write_text("".join(json.dumps(r) + "\n" for r in records))
+        os.chmod(self.root / ".driver.log", 0o600)
+
+    def verb_calls(self):
+        """Every verb call in the log: on turn records and on lines of their own."""
+        on_turns = [(v["verb"], v["exit"]) for r in self.records("turn") for v in r.get("verbs", [])]
+        alone = [(r["verb"], r["exit"]) for r in self.records("verb")]
+        return on_turns, alone
+
+    def test_a_verb_line_left_on_disk_is_attached_once_however_often_the_log_is_written(self):
+        # S60, round 2 F1
+        turn = {"type": "turn", "number": 1, "session": "session-1", "items": [], "start": 1, "end": 2}
+        verb = {"type": "verb", "at": 1.5, "verb": "reply", "exit": 0, "turn": 1}
+        self.write_log({**turn, "outcome": "completed"}, verb)
+        driver = self.driver()
+        driver.start()
+        for _ in range(6):
+            driver.log("pairing", event="paired")
+        self.assertEqual(self.verb_calls(), ([("reply", 0)], []))
+
+    def test_a_verb_line_before_any_turn_is_kept(self):
+        # S60, round 2 F1
+        self.write_log({"type": "verb", "at": 1.5, "verb": "pending", "exit": 3, "turn": None})
+        driver = self.driver()
+        driver.start()
+        for _ in range(3):
+            driver.log("pairing", event="paired")
+        self.assertEqual(self.verb_calls(), ([], [("pending", 3)]))
+        # A later serve reads the same log and still holds the call once.
+        driver.close()
+        self.driver().start()
+        self.assertEqual(self.verb_calls(), ([], [("pending", 3)]))
+
+    def test_a_verb_line_between_turns_stays_on_its_own_line(self):
+        # S60, round 2 F1: no turn ran when the verb did, so no turn record takes it
+        turn = {"type": "turn", "number": 1, "session": "session-1", "items": [], "start": 1, "end": 2}
+        self.write_log({**turn, "outcome": "completed"}, {"type": "verb", "at": 3, "verb": "set", "exit": 0})
+        driver = self.driver()
+        driver.start()
+        driver.log("pairing", event="paired")
+        self.assertEqual(self.verb_calls(), ([], [("set", 0)]))
+
+    def test_verb_lines_appended_while_the_driver_writes_the_log_are_never_lost(self):
+        # S60, round 2 F1: log_verb appends while the driver replaces the file
+        from better_ai.page.driver_state import log_verb
+
+        driver = self.driver()
+        driver.start()
+        count = 150
+
+        def verbs():
+            for index in range(count):
+                log_verb(self.conv.unit, f"v{index}", 0)
+
+        def flushes():
+            for _ in range(count):
+                driver.log("pairing", event="paired")
+
+        threads = [threading.Thread(target=verbs), threading.Thread(target=flushes)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        driver.log("pairing", event="paired")
+        on_turns, alone = self.verb_calls()
+        self.assertEqual(sorted(on_turns + alone), sorted((f"v{index}", 0) for index in range(count)))
+
+    def test_a_known_frame_the_codec_ignores_ends_the_protocol_clock(self):
+        # S112, round 2 F2: a frame that maps to no event is still a known message
+        script = (
+            "import sys, time\n"
+            'print(\'{"t": "ready"}\', flush=True)\n'
+            "for line in sys.stdin:\n"
+            '    print(\'{"t": "odd"}\', flush=True)\n'
+            '    print(\'{"t": "known"}\', flush=True)\n'
+        )
+
+        class Codec:
+            def __init__(self, send):
+                self.send = send
+
+            def open(self, cwd, resume):
+                pass
+
+            def prompt(self, text, uuid=None):
+                self.send({"prompt": text})
+
+            def receive(self, message):
+                if message["t"] == "ready":
+                    return (SimpleNamespace(kind="ready", session_id="session-1"),)
+                if message["t"] == "odd":
+                    return (SimpleNamespace(kind="unknown"),)
+                return ()
+
+        self.conv.item("one")
+        driver = self.driver(
+            launch=lambda tag: self.module.ProcessTransport(
+                [sys.executable, "-c", script], self.root, os.environ, Codec
+            )
+        )
+        with mock.patch.object(self.module, "PROTOCOL_TIMEOUT", 0.4):
+            driver.start()
+            eventually(lambda: driver.snapshot()["state"] == "working")
+            time.sleep(1.2)
+            self.assertEqual(driver.snapshot()["state"], "working")
+
+    def test_serve_records_the_orphan_it_ends_before_the_driver_starts(self):
+        # S98, round 2 F3: serve ends the orphan in stop_orphan, before the driver looks
+        from better_ai.page import stop_orphan
+        from better_ai.page.transport import process_command
+
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
+        self.addCleanup(child.wait)
+        self.addCleanup(child.kill)
+        command = process_command(child.pid)
+        self.saved(child_pid=child.pid, child_argv=command.split(" "))
+        stop_orphan(self.conv.unit)
+        self.assertEqual(child.wait(timeout=5), -signal.SIGTERM)
+        ended = self.state()["ended"]
+        self.assertEqual((ended["reason"], ended["kind"]), ("orphan ended at start", "orphan"))
+        self.assertTrue(ended["at"])
+        self.driver().start()
+        self.assertEqual(self.state()["ended"]["reason"], "orphan ended at start")
+
+
 if __name__ == "__main__":
     unittest.main()
