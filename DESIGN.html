@@ -286,6 +286,57 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .why { margin-top:var(--space-item); }
 .thread .reply + .why { margin-top:var(--space-edge); }
 
+/* One row per thread (pageConversation): the head, which opens and folds the thread, then its messages when open, then
+   how many messages and the buttons of its state. The left edge carries the state: umber your turn, terracotta working,
+   moss-dark done, sand otherwise. */
+.notes-top .seg button { white-space:nowrap; }
+.thread > li.trow { padding:var(--space-item); background:var(--white); border:1px solid var(--line); border-left:4px solid var(--sand); }
+.thread > li.trow[data-state="asked"] { border-left-color:var(--umber); }
+.thread > li.trow[data-state="working"] { border-left-color:var(--terracotta); }
+.thread > li.trow[data-state="done"] { border-left-color:var(--moss-dark); }
+.thead { display:block; width:100%; margin:0; padding:0; border:0; background:none; text-align:left; cursor:pointer; font:inherit; color:inherit; }
+.thead:hover .tgist { text-decoration:underline; }
+.ttop { display:flex; align-items:flex-start; gap:var(--space-control); }
+.tchips { flex:1; display:flex; flex-wrap:nowrap; align-items:center; gap:var(--space-tight) var(--space-control); min-height:28px; }
+.tchips .progress { white-space:nowrap; }
+/* The fold control is a drawn equilateral triangle, with no outline: ▼ to open, ▲ to fold. */
+.tfold { flex:none; margin-left:auto; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; color:var(--ink); }
+.thead:hover .tfold { color:var(--umber); }
+.tage { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); }
+.tgist { display:block; margin:var(--space-tight) 0 0; font-size:var(--text-message); line-height:1.45; color:var(--heading); }
+.twho { font-weight:700; }
+.tfoot { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-tight) var(--space-control); margin-top:var(--space-control); }
+.tleft { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:baseline; font-size:var(--text-small); color:var(--muted); }
+.tleft .link { border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
+.tacts { display:flex; gap:var(--space-control); margin-left:auto; }
+.tacts .close { min-width:2.25rem; }
+/* Answer is the one filled button on a row, in the colour of what waits for you; the others are outlined. */
+.tacts .primary { padding-left:var(--space-section); padding-right:var(--space-section); }
+/* An open thread: its messages run flat across the row, no box inside the box; yours on white, the agent's on linen. */
+.tbody { margin:var(--space-control) calc(-1 * var(--space-item)) 0; border-top:1px solid var(--line); }
+.tmsg { padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
+.tmsg.agent { background:var(--linen); --muted:var(--ink); }
+.tmsg .head { display:flex; flex-wrap:wrap; gap:var(--space-control); font-size:var(--text-small); color:var(--muted); }
+.tmsg .who { font-weight:700; color:var(--umber); }
+.tmsg.mine .who { color:var(--heading); }
+.tmsg .tag { font-weight:700; color:var(--error); }
+.tmsg .md, .tmsg > :not(.head) { font-size:var(--text-message); line-height:1.45; }
+.tmsg.agent code { background:var(--cream); }
+.tmsg code { padding:0 .2em; }
+li.trow .why { margin-top:var(--space-control); display:grid; gap:var(--space-tight); }
+li.trow .why label { margin:0; font-size:var(--text-small); font-weight:700; }
+li.trow .why textarea { border-color:var(--ink); }
+li.trow .why .row2 { display:flex; gap:var(--space-control); }
+li.trow .why .err { margin:0; font-size:var(--text-small); color:var(--error); font-weight:700; }
+/* A close in its undo window: the row stays in place as Closed, with its own Undo. */
+li.trow.closing { display:flex; justify-content:space-between; align-items:center; gap:var(--space-control); }
+.tclosed { flex:1; display:grid; gap:var(--space-tight); justify-items:start; }
+.tclosed .tgist { margin:0; color:var(--muted); }
+/* Rows out of view above: how many, and a way there. */
+.tabove { display:block; width:calc(100% - 2 * var(--space-edge)); margin:0 var(--space-edge) var(--space-tight); padding:var(--space-tight); border:1px solid var(--line);
+  background:var(--white); cursor:pointer; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+.tabove[hidden] { display:none; }
+
 /* The Approve… panel (pageApprovalPanel), above the message box. */
 .approval { border:1px solid var(--sand); background:var(--white); padding:var(--space-control) var(--space-item); margin-bottom:var(--space-item); }
 .approval .menu-h { color:var(--muted); margin:0 0 var(--space-control); }
@@ -930,14 +981,9 @@ function pageCommentPosition(x, y, pop) {
 // o.byId(id)     the page's own model of a comment, which offers Show, Edit and Delete; nothing when it offers none
 // o.crumb(e)     where a comment was made; o.commentBody(e) what it says (its text)
 // o.reveal(e), o.edit(it, button), o.remove(it), o.showLabel(n)   the comment's Show, Edit and Delete
-// o.kinds        renderers for the page's own kinds of event: function (c, state) returning the item, or [item, foot]
-// o.itemKinds    the user's actions the agent tracks with a state (default comment and note)
-// o.agentKinds   the agent's messages the user can reply to (default reply)
-// o.steps, o.labels, o.shown(state)   the progress steps the page has, their words, and the step a state shows as
-// o.accept       a done item offers Accept (default true); without it, a done item is finished
-// o.filter       the thread has Open and All (default true); without it, one list in time order
-// o.waiting(c, state)  an entry that waits for the user, shown last (default: the agent's own unanswered question)
-// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom, waiting ones last (default: by first message)
+// o.kinds        renderers for the page's own kinds of event: function (c, state, actions) returning the item, or [item, foot].
+//                The item's content is the thread's first message; the buttons of FOOT, if any, are the row's buttons.
+// o.itemKinds    the user's kinds that start a thread with the agent (default comment and note)
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
@@ -945,13 +991,13 @@ function pageCommentPosition(x, y, pop) {
 // o.sendMode()   a function to run instead of sending a message when the Send button is pressed, or null
 // o.busy()       the page has something open the user would lose on a reload
 // o.beforeReload()  keep the page's place before a new render loads
-// o.rendered(state)  called after each redraw with every item's state, to sync the pins
+// o.rendered(state)  called after each redraw with the state of every user item, by id, for its pin: new, seen,
+//                working, asked (your turn), done, accepted (you closed it)
 function pageConversation(o) {
   var rpcId = 0, log = [], state = {}, fed = null, itemKinds = o.itemKinds || ['comment', 'note'], kinds = o.kinds || {};
-  var agentKinds = o.agentKinds || ['reply'], agent = o.agent || pageRole().replace(/^./, function (c) { return c.toUpperCase(); }), accept = o.accept !== false, filtering = o.filter !== false;
+  var agent = o.agent || pageRole().replace(/^./, function (c) { return c.toUpperCase(); });
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
   function time(at) { return pageTime(at); }
-  if (!filtering) { var seg = document.querySelector('.notes-top .seg'); if (seg) seg.remove(); }
   var status = document.querySelector('.notes .status');
   function say(text, error) { if (!status) return; status.textContent = text; status.classList.toggle('error', !!error); }
   // Every action shows a toast at the bottom of the window: sending, then sent or failed.
@@ -995,18 +1041,19 @@ function pageConversation(o) {
     renderThread();
   }
 
-  // ---------- The thread: everything sent and every reply, in order; a comment shows once, in its latest state ----------
+  // ---------- The panel: one row per thread, each in the one state every thread has (pageThreads) ----------
+  // A row: the state (Your turn and how long it has waited; the agent's turn with its progress; or Done), who started
+  // the thread and its first sentence, the triangle, how many messages and when the last came, and the buttons of its
+  // state. The whole head opens and folds the thread. Open lists what you have not closed: done first, then the agent's
+  // turn, then your turn last, next to the message box; All lists every thread in time order.
   var thread = o.thread || document.querySelector('.thread');
-  function body(text) { return pageMarkdown(text); }
-  function head(who, at) { var h = el('div', 'head'); h.append(el('span', 'who', who), el('span', 'when', time(at))); return h; }
-  // A reply that names the message it answers is shown under that message, so the user sees what was answered.
-  function replyBlock(e) {
-    var mine = e.type !== 'reply', r = el('div', mine ? 'reply mine' : 'reply'), h = head(mine ? 'You' : agent, e.at);
-    if (e.type === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
-    r.append(h, body(e.text));
-    return r;
-  }
-  var filter = filtering ? 'open' : 'all', scrolledOnce = false;
+  var filter = 'open', scrolledOnce = false, threads = [], model = null;
+  // What the user has open or typed, by thread key, kept across every redraw: the threads they opened, the one box
+  // (an answer, a reply or why they reopen it), drafts and errors by box, the closes in their undo window, the closes
+  // sent but not yet in the log, and the control to focus once the next redraw is done.
+  var expanded = {}, box = null, drafts = {}, errors = {}, closing = {}, closed = {}, focusAfter = null;
+  var CLOSE_MS = 6000, BARS = ['seen', 'working', 'done'], STEP_WORDS = { new: 'Not seen', seen: 'Seen', working: 'Working', done: 'Done' };
+  var PLAIN = ['comment', 'note', 'reply'];
   document.querySelectorAll('[data-filter]').forEach(function (b) {
     b.addEventListener('click', function () {
       filter = b.dataset.filter;
@@ -1014,149 +1061,334 @@ function pageConversation(o) {
       renderThread();
     });
   });
-  var STEPS = o.steps || ['seen', 'working', 'done', 'accepted'],
-      LABEL = Object.assign({}, PAGE_STATES, o.labels || {});
-  // The box for an answer or a reply, under the item. The button that opened it hides in place while it is open, and
-  // the box goes only once the message is sent. By default it sends a note under the item; onSend(text, done) sends
-  // something else, such as the answer to a decision.
-  function reasonBox(li, id, label, from, onSend) {
-    if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
-    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
-        ok = el('button', 'btn btn--sm', 'Send'), no = el('button', 'btn btn--quiet btn--sm cancel', 'Cancel');
-    ta.setAttribute('aria-label', label); ta.placeholder = label;
-    ok.type = no.type = 'button';
-    if (from) from.style.visibility = 'hidden';
-    // A redraw moves the box into a new item, whose own buttons it hid: show those again, not only the first one.
-    function close() {
-      var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
-      var again = host ? host.querySelectorAll('.foot .answer, .foot .change') : [];
-      again.forEach(function (b) { b.style.visibility = ''; });
-      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item. After a
-      // redraw that button is gone: its copy in the redrawn item takes the focus instead.
-      if (from) { var back = document.contains(from) ? from : again[again.length - 1]; if (back) back.focus({ preventScroll: true }); }
-    }
-    function sendIt() {
-      var r = ta.value.trim(); if (!r) return ta.focus();
-      var done = function () { close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); };
-      if (onSend) return onSend(r, done);
-      send('note', { id: 'm-' + Date.now().toString(36), to: id, text: r }, label === 'Your answer' ? 'Answer' : 'Reply', done);
-    }
-    ok.addEventListener('click', sendIt); no.addEventListener('click', close);
-    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); sendIt(); } if (k.key === 'Escape') close(); });
-    row.append(ok, no); box.append(ta, row); li.append(box); box.scrollIntoView({ block: 'nearest' }); ta.focus();
+  function keyOf(t) { return t.id != null ? String(t.id) : 'at-' + threads.indexOf(t); }
+  function whoOf(e) { return e.by === 'user' ? 'You' : agent; }
+  function day(at) {
+    var d = new Date(at);
+    if (isNaN(d)) return '';
+    return d.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + ', ' + time(at);
   }
-  // The progress mark: a short bar per step fills as the agent sees an item, works on it, finishes it and the user
-  // accepts it. Before the agent sets a state, the bars are empty and the word is Sent.
-  function progressChip(st) {
-    if (st && o.shown) st = o.shown(st);
-    var k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
+  // How long a state has held, in the words of the row.
+  function age(at) {
+    var s = Math.max(0, (Date.now() - Date.parse(at)) / 1000);
+    if (isNaN(s)) return '';
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min';
+    if (s < 36 * 3600) return Math.round(s / 3600) + ' h';
+    return Math.round(s / 86400) + ' days';
+  }
+  function aged(words, at) { var a = age(at); return a ? words + ', ' + a : words; }
+  // The first sentence of the message that started the thread, without its marks; nobody names threads.
+  function rootText(e) { return e.type === 'decision' ? (e.x && e.x.asked) || '' : e.text || e.label || e.option || ''; }
+  function gist(text) {
+    var t = pageMarkdownText(text || ''), s = t.split(/(?<=[.?!])\s/)[0];
+    return s.length > 120 ? s.slice(0, 117).replace(/\s+\S*$/, '') + '…' : s;
+  }
+  // A control the redraw can find again: KEY names it, such as "toggle:<thread>".
+  function keyed(x, key) { x.dataset.fk = key; return x; }
+  function find(key) {
+    var all = thread.querySelectorAll('[data-fk]');
+    for (var i = 0; i < all.length; i++) if (all[i].dataset.fk === key) return all[i];
+    return null;
+  }
+  function button(text, cls, on, label) {
+    var b = el('button', 'btn btn--sm' + (cls ? ' ' + cls : ''), text); b.type = 'button';
+    if (label) b.setAttribute('aria-label', label);
+    b.addEventListener('click', on);
+    return b;
+  }
+  function stateChip(t) { return t.state === 'you' ? el('span', 'chip wait', 'Your turn') : el('span', 'chip', 'Agent’s turn'); }
+  // The agent's progress: a bar per step it reached, seen, working and done (green); none before it has seen your message.
+  function progress(t) {
+    var step = t.state === 'done' ? 'done' : t.step, k = BARS.indexOf(step);
+    var chip = el('span', 'progress' + (step === 'new' ? '' : ' ' + step)), bars = el('span', 'bars');
     bars.setAttribute('aria-hidden', 'true');
-    for (var j = 0; j < STEPS.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
-    chip.append(bars, el('span', '', st ? LABEL[st] || st : 'Sent'));
+    for (var j = 0; j < BARS.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
+    chip.append(bars, el('span', '', aged(STEP_WORDS[step], t.since)));
     return chip;
   }
-  // One entry of the thread; without actions, as in a copy to read or a list elsewhere on the page.
-  function entryNode(c, actions) {
-    var e = c.e, li, foot;
-    if (c.kind === 'comment') {
-      li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
-      var h = el('div', 'head');
-      if (e.n) h.append(el('span', 'n', e.n));
-      h.append(el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
-      var it = actions && o.byId && o.byId(e.id);
-      if (it && !c.deleted && state[e.id] !== 'done' && state[e.id] !== 'accepted') {
-        var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit'), del = el('button', 'link', 'Delete');
-        where.type = edit.type = del.type = 'button';
-        where.setAttribute('aria-label', o.showLabel(e.n)); edit.setAttribute('aria-label', 'Edit comment ' + e.n); del.setAttribute('aria-label', 'Delete comment ' + e.n);
-        where.addEventListener('click', function () { o.reveal(e); });
-        edit.addEventListener('click', function () { o.reveal(e); o.edit(it, edit); });
-        del.addEventListener('click', function () { o.remove(it); });
-        h.append(where, edit, del);
+  function body(text) { return pageMarkdown(text); }
+  // One message of an open thread, flat across the row: yours on white, the agent's on linen.
+  function message(e, entry) {
+    var m = el('div', 'tmsg ' + (e.by === 'user' ? 'mine' : 'agent')), h = el('div', 'head');
+    if (e.type === 'comment' && e.n) h.append(el('span', 'n', e.n));
+    h.append(el('span', 'who', whoOf(e)), el('span', 'when', day(e.at) + (e.type === 'comment' && entry && entry.edited ? ', edited' : '')));
+    if (e.type === 'reopen') h.append(el('span', 'tag', 'Reopened'));
+    m.append(h);
+    if (e.type === 'comment') {
+      var crumb = o.crumb && o.crumb(e), said = o.commentBody ? o.commentBody(e) : body(e.text);
+      if (crumb) m.append(crumb);
+      if (said) m.append(said);
+    } else m.append(body(e.text));
+    return m;
+  }
+  // A page's own kind of first message, drawn by its renderer: its content becomes the first message, and the buttons
+  // of its foot, without its own progress (the row says the state once), become the row's buttons.
+  function kindParts(t, actions) {
+    var c = model.byId[keyOf(t)];
+    if (!c || !kinds[c.kind]) return null;
+    var made = kinds[c.kind](c, model.state, actions), item = Array.isArray(made) ? made[0] : made, foot = Array.isArray(made) ? made[1] : null;
+    if (!item) return null;
+    var m = el('div', 'tmsg ' + (t.root.by === 'user' ? 'mine' : 'agent') + ' ' + String(item.className || '').replace(/\bopen-q\b/, '').trim());
+    Array.prototype.slice.call(item.childNodes).forEach(function (n) { m.append(n); });
+    var buttons = foot ? Array.prototype.filter.call(foot.children, function (b) { return b.tagName === 'BUTTON'; }) : [];
+    return { node: m, buttons: buttons, openQ: /\bopen-q\b/.test(item.className || ''), d: item.dataset && item.dataset.d, text: m.textContent };
+  }
+  // The box under an open thread: your answer or reply, or why you reopen it. Its text survives every redraw. ONSEND,
+  // from a page's own kind, sends something else, such as the answer to a decision.
+  function writeBox(t, k) {
+    var mode = box.mode, dk = k + ':' + mode, f = el('div', 'why'), domId = 'tbox-' + k.replace(/[^\w-]/g, '_');
+    var words = box.label || (mode === 'reopen' ? 'Why reopen it?' : t.state === 'you' ? 'Your answer' : 'Your reply');
+    var lab = el('label', '', words), ta = keyed(el('textarea'), 'box:' + k), err = el('p', 'err', errors[dk] || '');
+    ta.id = domId; lab.htmlFor = domId; ta.rows = 3; ta.value = drafts[dk] || '';
+    err.id = domId + '-err'; err.hidden = !errors[dk];
+    if (errors[dk]) { ta.setAttribute('aria-invalid', 'true'); ta.setAttribute('aria-describedby', err.id); }
+    ta.addEventListener('input', function () {
+      drafts[dk] = ta.value;
+      if (errors[dk]) { errors[dk] = null; err.hidden = true; ta.removeAttribute('aria-invalid'); }
+    });
+    var from = box.from, onSend = box.onSend, row = el('div', 'row2');
+    var ok = button(mode === 'reopen' ? 'Reopen' : 'Send', '', submit), no = button('Cancel', 'btn--quiet', cancel);
+    function cancel() { box = null; focusAfter = from; renderThread(); }
+    function submit() {
+      var text = ta.value.trim();
+      if (!text) {
+        errors[dk] = mode === 'reopen' ? 'Say why you reopen it.' : 'Write your ' + (/answer/i.test(words) ? 'answer' : 'reply') + ' first.';
+        focusAfter = 'box:' + k; renderThread(); return;
       }
-      li.append(h, o.crumb(e), c.deleted ? el('p', 'body', 'Deleted') : o.commentBody(e));
-    } else if (c.kind === 'note') {
-      li = el('li', 'msg me'); li.append(head('You', e.at), body(e.text));
-    } else if (c.kind === 'reply') {
-      li = el('li', 'msg agent'); li.append(replyBlock(e));
-    } else if (kinds[c.kind]) {
-      var made = kinds[c.kind](c, state, actions);
-      if (Array.isArray(made)) { li = made[0]; foot = made[1]; } else li = made;
-    } else return null;
-    c.replies.forEach(function (r) { li.append(replyBlock(r)); });
-    if (foot) li.append(foot);
-    if (agentKinds.indexOf(c.kind) >= 0 && e.id && actions) {  // the agent's own messages can be answered too; the state row closes them
-      var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.type === 'note'; }), last = mine[mine.length - 1];
-      if (last) rf.append(progressChip(state[last.id]));
-      var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
-      rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
-      rf.append(rb); li.append(rf);
+      var done = function () {
+        drafts[dk] = ''; errors[dk] = null;
+        if (box && box.key === k) box = null;
+        focusAfter = 'toggle:' + k; renderThread();
+      };
+      if (onSend) return onSend(text, done);
+      if (mode === 'reopen') send('reopen', { to: t.id, text: text }, 'Reopen', done);
+      else send('note', { id: 'm-' + Date.now().toString(36), to: t.id, text: text }, /answer/i.test(words) ? 'Answer' : 'Reply', done);
     }
-    // The state and what the user can do with it close the item, after the latest reply, where the eye ends.
-    if (itemKinds.indexOf(c.kind) >= 0) {
-      var f = el('div', 'foot');
-      f.append(progressChip(state[e.id]));
-      // A done item is accepted with the brown check next to Reply; replying instead puts it back with the agent.
-      if (actions && accept && state[e.id] === 'done') {
-        var ok = el('button', 'btn btn--sm answer', '✓'); ok.type = 'button'; ok.title = 'Accept'; ok.setAttribute('aria-label', 'Accept');
-        ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance', function () { li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); }); });
-        f.append(ok);
-      }
-      // Every message can be answered: Answer when the agent asked something, Reply otherwise.
-      if (actions) {
-        var asked = state[e.id] === 'asked', ans = el('button', 'btn btn--sm answer' + (asked ? '' : ' btn--quiet'), asked ? 'Answer' : 'Reply');
-        ans.type = 'button';
-        ans.addEventListener('click', function () { reasonBox(li, e.id, asked ? 'Your answer' : 'Your reply', ans); });
-        f.append(ans);
-      }
-      li.append(f);
-      if (state[e.id]) li.dataset.state = state[e.id];
-    }
-    if (e.id) li.dataset.id = e.id;
+    ta.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); }
+    });
+    row.append(ok, no); f.append(lab, ta, err, row);
+    return f;
+  }
+  function openBox(t, mode, more) {
+    var k = keyOf(t);
+    box = Object.assign({ key: k, mode: mode, from: 'act:' + mode + ':' + k }, more);
+    expanded[k] = true; focusAfter = 'box:' + k; renderThread();
+  }
+  // Close is recorded once its 6-second window is over. Meanwhile the row stays in place as Closed with its own Undo,
+  // so closing several threads in a row keeps an Undo for each, next to what it undoes.
+  function close(t, first) {
+    var k = keyOf(t);
+    closing[k] = { first: first, timer: setTimeout(function () {
+      delete closing[k]; closed[k] = true;
+      send('accept', { to: t.id }, 'Close', null, function () { delete closed[k]; renderThread(); });
+      renderThread();
+    }, CLOSE_MS) };
+    focusAfter = 'undo:' + k; renderThread();
+  }
+  function closedRow(t, k) {
+    var li = el('li', 'trow closing'), c = closing[k], p = el('div', 'tclosed'), g = el('span', 'tgist');
+    li.dataset.state = 'done'; li.dataset.id = k;
+    g.append(el('span', 'twho', whoOf(t.root) + ': '), c.first);
+    p.append(el('span', 'chip ok', 'Closed'), g);
+    var u = keyed(button('Undo', 'btn--quiet', function () {
+      clearTimeout(c.timer); delete closing[k]; focusAfter = 'toggle:' + k; renderThread();
+    }, 'Undo closing: ' + c.first), 'undo:' + k);
+    li.append(p, u);
     return li;
   }
+  function row(t, actions, forceOpen) {
+    var k = keyOf(t);
+    if (closing[k] && actions) return closedRow(t, k);
+    var kind = kindParts(t, actions);
+    if (!kind && PLAIN.indexOf(t.root.type) < 0) return null;
+    var first = gist(rootText(t.root) || (kind && kind.text)), open = forceOpen || !!expanded[k], li = el('li', 'trow');
+    li.dataset.state = t.state === 'you' ? 'asked' : t.state === 'done' ? 'done' : t.step === 'working' ? 'working' : 'seen';
+    if (t.id != null) li.dataset.id = t.id;
+    if (kind && kind.openQ) li.classList.add('open-q');
+    if (kind && kind.d) li.dataset.d = kind.d;
+    // The head opens and folds the thread: one native button, as wide as the row.
+    var head = keyed(el('button', 'thead'), 'toggle:' + k), top = el('span', 'ttop'), chips = el('span', 'tchips');
+    head.type = 'button'; head.setAttribute('aria-expanded', String(open));
+    var said = t.state === 'you' ? 'Your turn' : t.state === 'done' ? 'Done' : 'Agent’s turn, ' + STEP_WORDS[t.step].toLowerCase();
+    head.setAttribute('aria-label', said + '. ' + whoOf(t.root) + ': ' + first.replace(/[.?!…]$/, '') + '. ' + (open ? 'Fold the thread' : 'Open the thread'));
+    if (t.state !== 'done') chips.append(stateChip(t));
+    if (t.state === 'you') chips.append(el('span', 'tage', aged('Waiting', t.since)));
+    else chips.append(progress(t));
+    // A drawn equilateral triangle, sharp as the n14n style has it: down to open, up to fold.
+    var fold = el('span', 'tfold'); fold.setAttribute('aria-hidden', 'true');
+    fold.innerHTML = '<svg width="16" height="13.86" viewBox="0 0 16 13.86"><polygon points="' +
+      (open ? '0,13.86 8,0 16,13.86' : '0,0 16,0 8,13.86') + '" fill="currentColor"/></svg>';
+    top.append(chips, fold); head.append(top);
+    if (!open) { var g = el('span', 'tgist'); g.append(el('span', 'twho', whoOf(t.root) + ': '), first); head.append(g); }
+    head.addEventListener('click', function () { expanded[k] = !open; focusAfter = 'toggle:' + k; renderThread(); });
+    li.append(head);
+    if (open) {
+      var b = el('div', 'tbody'), entry = model.byId[k];
+      t.messages.forEach(function (e, i) { b.append(i === 0 && kind ? kind.node : message(e, entry)); });
+      li.append(b);
+    }
+    var editing = actions && box && box.key === k;
+    if (editing) li.append(writeBox(t, k));
+    var foot = el('div', 'tfoot'), left = el('span', 'tleft'), acts = el('span', 'tacts'), n = t.messages.length;
+    left.append(el('span', 'tmeta', (n === 1 ? '1 message' : n + ' messages') + ', last ' + day(t.last)));
+    // A comment keeps Show, Edit and Delete while it is not done.
+    var it = actions && t.root.type === 'comment' && o.byId && o.byId(t.root.id), e0 = t.root;
+    if (it && t.state !== 'done') {
+      var link = function (words, label, on) { var x = el('button', 'link', words); x.type = 'button'; x.setAttribute('aria-label', label); x.addEventListener('click', on); return x; };
+      left.append(link('Show', o.showLabel ? o.showLabel(e0.n) : 'Show comment ' + e0.n, function () { o.reveal(e0); }),
+        link('Edit', 'Edit comment ' + e0.n, function (ev) { o.reveal(e0); o.edit(it, ev && ev.target); }),
+        link('Delete', 'Delete comment ' + e0.n, function () { o.remove(it); }));
+    }
+    function act(b, name) { acts.append(keyed(b, 'act:' + name + ':' + k)); }
+    if (actions && !editing && t.id != null) {
+      if (kind && kind.buttons.length) {
+        // The page's own controls, such as a decision's use-the-default check and Answer.
+        kind.buttons.forEach(function (b, j) { acts.append(keyed(b, /\bchange\b/.test(b.className) ? 'act:reply:' + k : 'kind:' + j + ':' + k)); });
+      } else {
+        if (!t.closedByUser) act(button('✓', 'btn--quiet close', function () { close(t, first); }, (t.state === 'done' ? 'Confirm done: ' : 'Close: ') + first), 'close');
+        if (t.state === 'you') act(button('Answer', 'primary', function () { openBox(t, 'reply'); }, 'Answer: ' + first), 'reply');
+        if (t.state === 'agent') act(button('Reply', 'btn--quiet', function () { openBox(t, 'reply'); }, 'Reply: ' + first), 'reply');
+        if (t.state === 'done') act(button('Reopen', 'btn--quiet', function () { openBox(t, 'reopen'); }, 'Reopen: ' + first), 'reopen');
+      }
+    }
+    foot.append(left, acts); li.append(foot);
+    return li;
+  }
+  // The threads as the page shows them: a close sent but not yet in the log already counts as closed.
+  function current() {
+    model = pageThread(log, itemKinds);
+    model.byId = {};
+    model.entries.forEach(function (c) { if (c.e.id != null) model.byId[String(c.e.id)] = c; });
+    threads = pageThreads(log, itemKinds);
+    return threads.filter(function (t) {
+      var k = keyOf(t);
+      if (closed[k] && t.closedByUser) delete closed[k];
+      else if (closed[k]) { t.state = 'done'; t.closedByUser = true; }
+      return !t.deleted && (PLAIN.indexOf(t.root.type) >= 0 || kinds[t.root.type]);
+    });
+  }
+  // Each user item's state, for its pin.
+  function pinStates() {
+    var s = {};
+    threads.forEach(function (t) {
+      var v = t.closedByUser ? 'accepted' : t.state === 'done' ? 'done' : t.state === 'you' ? 'asked' : t.step;
+      t.messages.forEach(function (m) { if (m.by === 'user' && m.id != null && itemKinds.indexOf(m.type) >= 0) s[m.id] = v; });
+    });
+    return s;
+  }
+  // What has focus in the list, so a redraw puts it back, with the caret; when it is gone, the head of the row now at
+  // its place takes it.
+  function focusKey() {
+    var a = document.activeElement;
+    if (!a || !thread.contains || !thread.contains(a)) return null;
+    var li = a.closest && a.closest('li.trow'), rows = Array.prototype.slice.call(thread.querySelectorAll('li.trow'));
+    return { key: a.dataset && a.dataset.fk, index: rows.indexOf(li), start: a.selectionStart, end: a.selectionEnd };
+  }
   function renderThread() {
-    var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var model = pageThread(log, itemKinds, o.waiting, o.latestLast), entries = model.entries, open = model.open;
-    state = model.state;
-    // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
-    // it is sent or cancelled, even when the item has left Open meanwhile.
-    var kept = {};
-    thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
-      var ta = box.querySelector('textarea');
-      kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
-    });
-    if (filtering) document.querySelector('[data-filter="open"]').textContent = 'Open (' + open.length + ')';
-    if (filter === 'open') entries = entries.filter(function (c) { return open.indexOf(c) >= 0 || (c.e.id && kept[c.e.id]); });
+    var kept = focusKey(), stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
+    var all = current(), actions = !o.readOnly;
+    state = pinStates();
+    var live = all.filter(function (t) { return closing[keyOf(t)] || !t.closedByUser; });
+    var yours = live.filter(function (t) { return t.state === 'you'; });
+    var shown = filter === 'open' ? live.filter(function (t) { return t.state === 'done'; })
+      .concat(live.filter(function (t) { return t.state === 'agent'; }), yours) : all;
+    // A box the user is typing in keeps its thread on the page until it is sent or cancelled.
+    if (box && filter === 'open' && !shown.some(function (t) { return keyOf(t) === box.key; })) {
+      shown = shown.concat(all.filter(function (t) { return keyOf(t) === box.key; }));
+    }
+    var openBtn = document.querySelector('[data-filter="open"]'), allBtn = document.querySelector('[data-filter="all"]');
+    if (openBtn) openBtn.textContent = 'Open (' + live.length + ')';
+    if (allBtn) allBtn.textContent = 'All (' + all.length + ')';
+    figure(yours.filter(function (t) { return !closing[keyOf(t)]; }));
+    var empty = document.querySelector('.notes .empty');
+    if (empty) empty.hidden = !!all.length;
     thread.replaceChildren();
-    // Before anything is sent, both views say how to start; after, Open says when nothing is left.
-    var started = log.some(function (x) { return x.type && x.type !== 'status'; });
-    document.querySelector('.notes .empty').hidden = started;
-    entries.forEach(function (c) {
-      var li = entryNode(c, !o.readOnly); if (!li) return;
-      var k = c.e.id && kept[c.e.id];
-      if (k) { li.append(k.box); li.querySelectorAll('.foot .answer, .foot .change').forEach(function (b) { b.style.visibility = 'hidden'; }); }
-      thread.appendChild(li);
-    });
-    // Focus only once the box is back in the page: a detached element cannot take it.
-    Object.keys(kept).forEach(function (id) {
-      var k = kept[id], ta = k.box.querySelector('textarea');
-      if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
-    });
-    if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
-    // The conversation opens on its latest message, and follows new ones while the user is at the bottom. The scroll
-    // repeats on the next frame and once fonts load, which can make the thread taller after this render.
+    shown.forEach(function (t) { var li = row(t, actions); if (li) thread.appendChild(li); });
+    if (filter === 'open' && all.length && !live.length) thread.appendChild(el('li', 'sys', 'Nothing open: every thread is done and closed.'));
+    // The list opens on its end, next to the message box, and follows new rows while the user is at the bottom. The
+    // scroll repeats on the next frame and once fonts load, which can make the list taller after this render.
     if (stick || !scrolledOnce) {
-      var bottom = function () { thread.scrollTop = thread.scrollHeight; };
+      var bottom = function () { thread.scrollTop = thread.scrollHeight; above(); };
       bottom(); requestAnimationFrame(bottom); if (document.fonts) document.fonts.ready.then(bottom);
       if (log.length) scrolledOnce = true;
     }
+    if (focusAfter) {
+      var target = find(focusAfter); focusAfter = null;
+      if (target) { target.focus({ preventScroll: true }); if (target.scrollIntoView) target.scrollIntoView({ block: 'nearest' }); }
+    } else if (kept) {
+      var back = kept.key && find(kept.key);
+      if (!back && kept.index >= 0) {
+        var rows = thread.querySelectorAll('li.trow'), r = rows[Math.min(kept.index, rows.length - 1)];
+        back = r && (r.querySelector('.thead') || r.querySelector('[data-fk]'));
+      }
+      if (back) { back.focus({ preventScroll: true }); if (kept.start != null && back.setSelectionRange) back.setSelectionRange(kept.start, kept.end); }
+    }
+    above();
     if (o.rendered) o.rendered(state);
   }
-  // Reply under a finished item from elsewhere on the page, such as its pin: the item comes into view with the box open.
+  // While rows are out of view above, a button says how many and takes the user there.
+  var cue = null;
+  function above() {
+    if (!thread.getBoundingClientRect || !thread.parentNode) return;
+    if (!cue) {
+      cue = el('button', 'tabove'); cue.type = 'button'; cue.hidden = true;
+      cue.addEventListener('click', function () { thread.scrollTo({ top: 0 }); });
+      thread.parentNode.insertBefore(cue, thread);
+    }
+    var top = thread.getBoundingClientRect().top, n = 0;
+    thread.querySelectorAll('li.trow').forEach(function (li) { if (li.getBoundingClientRect().top < top - 4) n++; });
+    cue.hidden = !n; cue.textContent = '▲ ' + n + (n === 1 ? ' more thread above' : ' more threads above');
+  }
+  thread.addEventListener('scroll', above);
+  // The top bar's figure: how many threads are your turn; a button to the first one's Answer, or plain at none.
+  var figureEl = null, stats = document.getElementById && document.getElementById('status');
+  function figure(yours) {
+    if (!stats) return;
+    var tag = yours.length ? 'BUTTON' : 'SPAN';
+    if (!figureEl || figureEl.tagName !== tag) {
+      if (figureEl) figureEl.remove();
+      figureEl = el(tag.toLowerCase(), 'stat');
+      if (yours.length) { figureEl.type = 'button'; figureEl.addEventListener('click', goYourTurn); }
+    }
+    figureEl.replaceChildren(el('b', '', String(yours.length)), ' your turn');
+    if (yours.length) figureEl.setAttribute('aria-label', yours.length + ' your turn: go to the first');
+    figureEl.first = yours[0];
+    if (stats.textContent.trim() === 'Loading…') stats.replaceChildren();
+    if (figureEl.parentNode !== stats) stats.append(figureEl);
+  }
+  // A page that writes its own figures into the top bar keeps this one there too.
+  if (stats && typeof MutationObserver !== 'undefined') {
+    new MutationObserver(function () { if (figureEl && figureEl.parentNode !== stats) stats.append(figureEl); }).observe(stats, { childList: true });
+  }
+  function goYourTurn() {
+    var t = figureEl.first; if (!t) return;
+    if (filter !== 'open') document.querySelector('[data-filter="open"]').click();
+    var b = find('act:reply:' + keyOf(t)) || find('toggle:' + keyOf(t));
+    if (b) { if (b.scrollIntoView) b.scrollIntoView({ block: 'center' }); b.focus(); }
+  }
+  // The thread an id belongs to: the thread itself, or a message in it.
+  function threadOf(id) {
+    for (var i = 0; i < threads.length; i++) {
+      var t = threads[i];
+      if (String(t.id) === String(id) || t.messages.some(function (m) { return m.id != null && String(m.id) === String(id); })) return t;
+    }
+    return null;
+  }
+  // A box under a thread, from a page's own kind, such as a decision's Answer: FROM is the button that opened it, and
+  // takes the focus back on Cancel; ONSEND(text, done) sends what the box holds.
+  function reasonBox(_li, id, label, from, onSend) {
+    var t = threadOf(id); if (!t) return;
+    openBox(t, 'reply', { label: label, onSend: onSend, from: from && from.dataset ? from.dataset.fk : null });
+  }
+  // From elsewhere on the page, such as a pin: the thread comes into view, open, with Reopen's box when it is done and
+  // the reply box otherwise.
   function reopen(id) {
-    if (filter === 'open' && state[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
-    var li = thread.querySelector('li[data-id="' + id + '"]'); if (!li) return;
-    li.scrollIntoView({ block: 'nearest' }); reasonBox(li, id, 'Your reply');
+    var t = threadOf(id); if (!t) return;
+    if (filter === 'open' && t.closedByUser) document.querySelector('[data-filter="all"]').click();
+    openBox(t, t.state === 'done' ? 'reopen' : 'reply');
   }
   // The page's whole log, when the page reads it itself; KEY is anything else the entries show, such as a deadline.
   // The thread is redrawn only when either changed, so focus and selection stay put between polls.
@@ -1165,18 +1397,27 @@ function pageConversation(o) {
     if (next === fed) return;
     fed = next; log = events.slice(); renderThread();
   }
-  // The user's items that match, without actions, such as the comments on one question.
+  // The rows of the user's threads that match, open and without actions, such as the comments on one task.
   function nodes(match) {
-    return pageThread(log, itemKinds, o.waiting, o.latestLast).entries
-      .filter(function (c) { return itemKinds.indexOf(c.kind) >= 0 && match(c.e); })
-      .map(function (c) { return entryNode(c, false); });
+    current();
+    return threads.filter(function (t) { return !t.deleted && itemKinds.indexOf(t.root.type) >= 0 && match(t.root); })
+      .map(function (t) { return row(t, false, true); }).filter(Boolean);
+  }
+  // The progress words of an item's state, for a page's own renderer (a decision without steps).
+  function progressChip(st) {
+    var steps = ['seen', 'working', 'done', 'accepted'], k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : steps.indexOf(st);
+    var chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
+    bars.setAttribute('aria-hidden', 'true');
+    for (var j = 0; j < steps.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
+    chip.append(bars, el('span', '', st ? PAGE_STATES[st] || st : 'Sent'));
+    return chip;
   }
 
   // ---------- The message box ----------
   var noteBox = document.querySelector('#note'), noteBtn = document.querySelector('.notes .send .btn');
   function sendNote() {
     var note = noteBox.value.trim();
-    if (!note) { noteBox.focus(); return; }
+    if (!note) { say('Write your message first.', true); noteBox.focus(); return; }
     send('note', Object.assign({ id: 'm-' + Date.now().toString(36), text: note, to: null }, o.noteParams ? o.noteParams() : {}), 'Message', function () { noteBox.value = ''; });
   }
   function mode() { return o.sendMode ? o.sendMode() : null; }
@@ -1187,8 +1428,8 @@ function pageConversation(o) {
 
   // ---------- Live updates ----------
   function busy() {
-    return !!noteBox.value.trim() || (o.busy && o.busy()) ||
-      Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
+    return !!(noteBox && noteBox.value.trim()) || !!(o.busy && o.busy()) ||
+      Object.keys(drafts).some(function (k) { return !!(drafts[k] || '').trim(); });
   }
   // Lines in the format before this change are one count under the header, the same on every page: kept as they are.
   function oldNote(count) {
@@ -1243,7 +1484,7 @@ function pageConversation(o) {
 
   return {
     send: send, say: say, flash: flash, reopen: reopen, render: renderThread, start: start, setLog: setLog, nodes: nodes,
-    box: reasonBox, progress: progressChip, noteBox: noteBox, noteBtn: noteBtn,
+    box: reasonBox, progress: progressChip, noteBox: noteBox, noteBtn: noteBtn, busy: busy,
     log: function () { return log; }, state: function () { return state; }
   };
 }
@@ -1658,7 +1899,7 @@ function pageDecision(o) {
     if (actions) {
       if (asked && x.default) {
         var use = document.createElement('button');
-        use.type = 'button'; use.className = 'btn btn--sm answer use'; use.textContent = '✓'; use.title = 'Use the default';
+        use.type = 'button'; use.className = 'btn btn--sm btn--quiet answer use'; use.textContent = '✓'; use.title = 'Use the default';
         use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
           var target = nextWaiting(x.id);
@@ -1676,7 +1917,7 @@ function pageDecision(o) {
         }
       }
       var change = document.createElement('button');
-      change.type = 'button'; change.className = 'btn btn--sm btn--quiet answer change';
+      change.type = 'button'; change.className = 'btn btn--sm answer change' + (asked ? '' : ' btn--quiet');
       change.textContent = asked ? 'Answer' : 'Reply';
       change.setAttribute('aria-label', (asked ? 'Answer: ' : 'Reply to: ') + q);
       change.addEventListener('click', function () {
