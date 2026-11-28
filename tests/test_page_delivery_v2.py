@@ -437,7 +437,7 @@ class WhenATurnStarts(Turns):
 class WhatAPromptSays(Turns):
     def test_every_prompt_starts_with_the_unit_the_approved_form_and_the_rules_S95(self):
         self.seed(note("m1"))
-        driver = self.make()
+        driver = self.make(Echoing, harness="claude")
         self.prompts()
         self.rpc(driver, note("m2"))
         self.end(self.peers[0])
@@ -451,6 +451,26 @@ class WhatAPromptSays(Turns):
                 "every word for the user through reply; end the turn when the items are handled; never serve", lines[2]
             )
         self.assertTrue(os.path.isabs(prompts[0].splitlines()[0].split(": ", 1)[1]))
+
+    def test_the_header_names_the_form_only_on_harnesses_that_approve_it_S95_D24(self):
+        # Claude Code and Codex approve the form without asking; the harnesses with no recorded shell request shape
+        # approve nothing, so their header says each call is asked on the page.
+        self.seed(note("m1"))
+        form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
+        none = "none: each call is asked on the page"
+        for harness, expected in (
+            ("claude", form),
+            ("codex", form),
+            ("cursor", none),
+            ("devin", none),
+            ("droid", none),
+            ("opencode", none),
+        ):
+            with self.subTest(harness=harness):
+                driver = self.make(harness=harness)
+                self.assertEqual(self.prompts()[0].splitlines()[1], f"Approved without asking: {expected}")
+                driver.close()
+                self.peers.clear()
 
     def test_the_form_in_the_header_is_the_form_that_is_approved_S95(self):
         form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
