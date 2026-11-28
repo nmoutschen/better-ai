@@ -415,6 +415,70 @@ class OffTest(Unit):
                 self.assertEqual(len(self.drive_kinds(done)), 1, done.stdout)
 
 
+# The kinds of S75, and every other kind a harness start can fail with (the adapters' failures and the driver's).
+S75_KINDS = (
+    "no-harness",
+    "login",
+    "not-installed",
+    "version",
+    "state-version",
+    "no-approvals",
+    "no-browser",
+    "crashed",
+    "driver",
+    "refused",
+    "timeout",
+)
+START_KINDS = (*S75_KINDS, "limit", "protocol", "unsafe-mode", "missing-session", "something-new")
+
+
+class OffTextTest(unittest.TestCase):
+    def test_no_driver_off_line_repeats_its_kind_as_its_text(self):  # S25, S33, S75, S146
+        from better_ai import page
+
+        for kind in START_KINDS:
+            for text in ("", kind):  # a StartError without text reads as its kind
+                with self.subTest(kind=kind, text=text):
+                    line = page.Off(kind, text).line()
+                    match = re.fullmatch(r"driver: off ([a-z-]+): (\S.*\S)", line)
+                    self.assertIsNotNone(match, line)
+                    self.assertIn(match.group(1), S75_KINDS)
+                    self.assertNotIn(match.group(2), START_KINDS, line)
+                    self.assertGreater(len(match.group(2).split()), 3, line)
+
+    def test_unsafe_mode_is_no_approvals_not_crashed(self):  # S75
+        from better_ai import page
+
+        self.assertRegex(page.Off("unsafe-mode", "").line(), r"^driver: off no-approvals: ")
+        self.assertRegex(page.Off("unsafe-mode", "Fix the setting.").line(), r"^driver: off no-approvals: Fix the setting\.$")
+
+    def test_a_given_text_is_kept(self):
+        from better_ai import page
+
+        self.assertEqual(page.Off("version", "found 1.0, need 2.0").line(), "driver: off version: found 1.0, need 2.0")
+
+
+class StartFailureTest(Unit):
+    def failed_start(self, kind):
+        boot = (
+            "from better_ai.page import driver\n\n"
+            "def fail(self, deadline):\n    raise driver.StartError(%r)\n\n"
+            "driver.Driver._open = fail\n" % kind
+        )
+        done = self.serve(boot=boot)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        lines = self.drive_kinds(done)
+        self.assertEqual(len(lines), 1, done.stdout)
+        return lines[0]
+
+    def test_a_start_failure_without_text_names_the_problem_and_the_action(self):  # S25, S33, S146
+        for kind, shown in (("version", "version"), ("no-approvals", "no-approvals"), ("unsafe-mode", "no-approvals")):
+            with self.subTest(kind):
+                line = self.failed_start(kind)
+                self.assertTrue(line.startswith(f"driver: off {shown}: "), line)
+                self.assertNotEqual(line, f"driver: off {shown}: {kind}")
+
+
 class RunningServerTest(Unit):
     def test_a_second_serve_says_already_and_exits_3(self):  # S28
         first = self.served()
