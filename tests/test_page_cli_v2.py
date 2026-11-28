@@ -714,6 +714,12 @@ class SpacedPathTest(Unit):
                 mock.patch.object(page, "command_of", side_effect=AssertionError("no command line parsing")),
             ):
                 self.assertIs(page.is_serve_of(4242, unit), expected)
+        own = {"server_pid": os.getpid(), "server_started": recorded}
+        with (
+            mock.patch.object(page, "current_state", return_value=own),
+            mock.patch.object(page, "process_started", return_value=recorded, create=True),
+        ):
+            self.assertIs(page.is_serve_of(os.getpid(), unit), False, "a serve never takes itself for the old server")
 
     def stopped_server_is_ended(self, name, spellings):
         spaced = self.root / name
@@ -746,7 +752,7 @@ class SpacedPathTest(Unit):
                 (self.folder / ".server").unlink(missing_ok=True)
 
     def test_a_stopped_server_of_a_unit_with_a_leading_space_is_ended(self):  # S108, round 3 B2
-        self.stopped_server_is_ended(" lead decks", (" lead decks/.show/deck", '" lead decks/.show/deck"'))
+        self.stopped_server_is_ended(" lead decks", ("' lead decks/.show/deck'", '" lead decks/.show/deck/"'))
 
     def test_a_stopped_server_of_a_unit_with_a_space_is_ended(self):  # S108, round 2 F2
         spaced = self.root / "my decks"

@@ -1096,43 +1096,21 @@ def command_of(pid: Any) -> str | None:
     return done.stdout.strip() or None
 
 
-def cwd_of(pid: int) -> str | None:
-    """The working folder of a process, or None where it cannot be read."""
-    try:
-        return os.readlink(f"/proc/{pid}/cwd")
-    except OSError:
-        pass
-    try:
-        done = subprocess.run(
-            ["lsof", "-a", "-d", "cwd", "-p", str(pid), "-Fn"], capture_output=True, text=True, timeout=5, check=False
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return next((line[1:] for line in done.stdout.splitlines() if line.startswith("n")), None)
+def process_started(pid: Any) -> str | None:
+    """When a process started, as `ps` prints it, or None when nothing runs at that pid."""
+    from .transport import process_started as started
+
+    return started(pid) if type(pid) is int and pid > 1 else None
 
 
 def is_serve_of(pid: Any, unit: Unit) -> bool:
-    """Whether the process is a `serve` of this unit: the word `serve` and then an argument that names the unit, in any
-    spelling (a trailing slash, a relative path from the serve's own folder, a symlink). `ps` joins the arguments with
-    spaces, so a path that holds spaces spans several words: every run of words after `serve` is tried as one path."""
-    words = (command_of(pid) or "").split(" ")
-    here = cwd_of(pid)
-    target = os.path.realpath(unit.path)
-    for at, word in enumerate(words):
-        if word != "serve":
-            continue
-        for start in range(at + 1, len(words)):
-            if not words[start] or words[start].startswith("-"):
-                continue
-            for end in range(start + 1, len(words) + 1):
-                path = " ".join(words[start:end])
-                if not os.path.isabs(path):
-                    if not here:
-                        continue
-                    path = os.path.join(here, path)
-                if os.path.realpath(path) == target:
-                    return True
-    return False
+    """Whether the process is the server `.driver` recorded for this unit: the same pid and the same start time, so a
+    reused pid never matches, and no command line is parsed (a path can hold any character, D22)."""
+    state = current_state(unit)
+    started = state.get("server_started")
+    if pid == os.getpid():
+        return False  # this process is the one serving now, never the old server to end
+    return bool(started) and pid == state.get("server_pid") and process_started(pid) == started
 
 
 def process_gone(pid: int) -> bool:

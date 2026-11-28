@@ -4,6 +4,7 @@ module's output does not hang the run (D20, D22, lesson L6)."""
 import importlib.util
 import os
 import signal
+import subprocess
 import tempfile
 import textwrap
 import time
@@ -14,12 +15,13 @@ RUN = Path(__file__).resolve().parent / "run.py"
 LEAK = textwrap.dedent(
     """
     import subprocess
+    import sys
     import unittest
 
 
     class Leak(unittest.TestCase):
         def test_leaves_a_detached_process(self):
-            child = subprocess.Popen(["sleep", "300"], start_new_session=True)
+            child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True)
             open(__file__ + ".pid", "w").write(str(child.pid))
     """
 )
@@ -32,12 +34,18 @@ def load_run():
     return module
 
 
-def alive(pid):
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    return True
+def alive(pid, wait=5.0):
+    """Whether pid still runs after up to `wait` s; an ended process can stay a zombie until init reaps it."""
+    end = time.monotonic() + wait
+    while True:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+        if state.startswith("Z") or time.monotonic() > end:
+            return not state.startswith("Z")
+        time.sleep(0.1)
 
 
 class RunGuardTest(unittest.TestCase):
