@@ -1060,6 +1060,7 @@ class TheScan(Turns):
         self.assertEqual(
             driver.agent()["problems"], [{"file": "logs/b1.jsonl", "line": 4, "text": "(record): not valid JSON"}]
         )
+        self.prompts()
         self.end(self.peers[0])
         eventually(lambda: self.state()["fired"])
         # The turn it started is over, but the line is still unreadable, so the page still says so.

@@ -80,9 +80,9 @@ def select(
     admitted_edits: set[tuple[str, str]] | None = None,
     all_working: bool = False,
 ) -> Delivery:
-    """The items the agent may be given: those in new, replied, followup or reopened, an edited one in any state, the
-    items the last normal turn left seen, those an abnormal end left seen or working, and, with `all_working`, every
-    item still working. A driven turn leaves out the settled ones (SETTLED), also when edited."""
+    """The items the agent may be given: those in new, replied, followup or reopened, an edited one that is not settled,
+    the items the last normal turn left seen, those an abnormal end left seen or working, and, with `all_working`, every
+    item still working. Never one in asked, done or accepted (SETTLED), also when the user edits it."""
     if after > len(events):
         after = 0
     updated = _updated_items(events, item_types, after)
@@ -92,7 +92,7 @@ def select(
         {**item, "status": state, **extra}
         for item, state, extra in items
         if state in READY
-        or (item["type"], item["id"]) in updated
+        or ((item["type"], item["id"]) in updated and state not in SETTLED)
         or (state == "seen" and item["id"] in carry_ids)
         or (state in ("seen", "working") and item["id"] in recover_ids)
         or (state == "working" and all_working)

@@ -492,7 +492,18 @@ class ApprovalTests(Case):
         self.assertIn("example", item["arguments"])
         self.assertEqual(
             set(body),
-            {"state", "since", "kind", "text", "mark_age", "approvals", "workers", "blocked", "auto_approved_once"},
+            {
+                "state",
+                "since",
+                "kind",
+                "text",
+                "mark_age",
+                "approvals",
+                "workers",
+                "blocked",
+                "auto_approved_once",
+                "problems",
+            },
         )
 
     def test_an_approval_has_no_deadline_and_is_relayed_after_an_hour(self):
@@ -622,7 +633,7 @@ class ApprovalTests(Case):
         self.peers[0].events.put(again)
         eventually(lambda: ("answer", 2, "allow_once", "Allowed earlier for this session") in self.peers[0].calls)
         self.assertEqual(driver.agent()["approvals"], [])
-        self.assertEqual(len(self.records("allowed")), 1)
+        self.assertEqual(len(self.records("asked_again")), 1)
 
     def test_auto_approval_is_reported_once_it_happened(self):
         driver = self.driver(launch=lambda tag: Answering(), verbs=("add", "set"))

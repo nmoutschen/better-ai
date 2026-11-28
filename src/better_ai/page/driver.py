@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 from .. import paths, resources
 from .approvals import approved_form, own_call, verb_command
-from .delivery import CONTINUE, NOTE, SETTLED, Delivery, ended_label, turn_prompt
+from .delivery import CONTINUE, NOTE, Delivery, ended_label, turn_prompt
 from .driver_state import (
     ACTIVE_DELIVERY,
     LOG,
@@ -49,6 +49,7 @@ TRIGGER_INTERVAL = 1.0  # the least time between two scans of the skill's trigge
 TRIGGER_BUDGET = 2.0  # a scan that takes longer is logged and its result skipped
 ECHOING = frozenset({"claude"})  # the harnesses that echo each prompt's uuid back (decision D5)
 MAX_UNECHOED = 3
+SHELL_KEYS = frozenset({"command", "description", "timeout"})
 ALIVE_LIMIT = 10
 MAX_APPROVAL_TEXT = 131072
 OPTIONS = ["allow_once", "allow_session", "deny"]
@@ -412,7 +413,16 @@ class Driver:
             "workers": self._worker_list(),
             "blocked": published["blocked"],
             "auto_approved_once": published["auto"],
+            "problems": self._problems(),
         }
+
+    def _problems(self) -> list:
+        """The record lines the last scan could not read (decision D21): shown while they stay unreadable."""
+        return [
+            {"file": r.get("file"), "line": r.get("line"), "text": r.get("problem")}
+            for r in self._scanned
+            if r.get("type") == "unreadable"
+        ]
 
     def _worker_list(self) -> list:
         try:
@@ -865,12 +875,9 @@ class Driver:
         batch.items[:] = [
             item
             for item in batch.items
-            if item["status"] not in SETTLED  # a turn never carries asked, done or accepted items (S15)
-            and (
-                item["id"] in admitted
-                or (item["id"] in self._carry and item["status"] in ("new", "seen"))
-                or (ended and item["status"] == "working")
-            )
+            if item["id"] in admitted
+            or (item["id"] in self._carry and item["status"] in ("new", "seen"))
+            or (ended and item["status"] == "working")
         ]
         events = Counter(encode(event) for event in self._admitted_events)
         actions = []
@@ -1120,13 +1127,17 @@ class Driver:
             self._answer_open(approval, "allow_once", "Approved page command")
         elif approval.key in self._grants:
             # The user allowed this tool and these arguments for the session: approve the repeat and log it (S145).
-            self._log("allowed", tool=tool, arguments_sha256=record["arguments_sha256"])
+            self._log("asked_again", tool=tool, arguments_sha256=record["arguments_sha256"])
             self._answer_open(approval, "allow_once", "Allowed earlier for this session")
 
     def _command_form(self, event) -> bool | None:
         """True for a command in the approved form, False for another call to the driver's own better.pyz, else None."""
         arguments = event.arguments
-        command = arguments.get("command") if isinstance(arguments, dict) and set(arguments) == {"command"} else None
+        # Claude Code's Bash input is {command, description} and may add timeout (tests/fixtures/page_wire/claude_2_1_332.json).
+        # Codex wraps the command in a login shell and sends more keys, so it never matches and is asked as any call is.
+        # Any other key, such as run_in_background, makes it no call of the form.
+        shaped = isinstance(arguments, dict) and "command" in arguments and set(arguments) <= SHELL_KEYS
+        command = arguments["command"] if shaped else None
         words = shlex.split(self.command)
         if len(words) != 2 or not own_call(command, words[1]):
             return None

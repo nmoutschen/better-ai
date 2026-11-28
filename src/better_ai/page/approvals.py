@@ -14,7 +14,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import webauthn
+from . import REPLY_STATES, webauthn
 
 
 class Pairing:
@@ -88,7 +88,7 @@ IDENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
 TAG = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,31}")
 FLAGS = {
     "reply": {"--by", "--to", "--state"},
-    "status": {"--by", "--text"},
+    "status": {"--by"},
     "pending": set(),
     "check": set(),
     "summary": set(),
@@ -160,12 +160,15 @@ def verb_command(command, unit, archive, verbs, interpreter=None):
             positional.append(arg)
         elif arg not in FLAGS[verb]:
             return False
-        elif arg != "--text":
+        else:
             value = next(it, "")
             if not IDENT.fullmatch(value) or (arg in NAMES and value == "user"):
                 return False
+            if arg == "--state" and value not in REPLY_STATES:
+                return False
     if verb == "status":
-        return len(positional) >= 2 and positional[0] in {"seen", "asked", "working", "done", "accepted"}
+        # Never accepted: the user's word accepts, not the agent's (decision D8).
+        return len(positional) >= 2 and positional[0] in {"seen", "asked", "working", "done"}
     return len(positional) == int(verb in {"add", "set"})
 
 

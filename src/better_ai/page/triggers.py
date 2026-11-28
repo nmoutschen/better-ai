@@ -4,7 +4,7 @@ A code hand-back is a handed_back entry. A research worker's stop or a verifier'
 work. Discover evidence and waiting decisions keep their own IDs when their records change. A trigger's id comes from
 the fields of its record, never from its place in a file, so a log that is reordered fires nothing again.
 
-A worker has started when its log holds a line and has handed back when its log holds the skill's end line. One that
+A worker runs while its log holds a line after its last end line of the skill. One that
 has no new line for LIMIT, or an item left working while no worker runs, gives an overdue trigger. A line that is not JSON, or a file that
 cannot be read, gives an unreadable trigger, once.
 """
@@ -72,6 +72,7 @@ def _unreadable(unit: Unit, relative: str, error: dict) -> dict:
         "id": f"unreadable:{relative}:{_digest([text, error['field'], error['message']])}",
         "type": "unreadable",
         "file": relative,
+        "line": error["line"],
         "problem": f"{error['field']}: {error['message']}",
     }
 
@@ -141,15 +142,18 @@ def _card_task(unit: Unit, name: str) -> str | None:
 
 
 def _running(unit: Unit, now: datetime) -> list[tuple[str, datetime | None]]:
-    """The workers whose log has a line and no end line, each with the time of its last line."""
+    """The workers with a line after their last end line (a worker started again after a hand-back runs again), each
+    with the time of the last of those lines."""
     end = ENDS.get(unit.skill.package)
     if end is None:
         return []
     running = []
     for relative in _files(unit, "logs", "*.jsonl"):
         lines = _lines(unit, relative)
-        if lines and not any(line.get("type") == end for line in lines):
-            last = max((m for m in (_moment(line.get("at")) for line in lines) if m), default=None)
+        ended = max((n for n, line in enumerate(lines) if line.get("type") == end), default=-1)
+        since = lines[ended + 1 :]
+        if since:
+            last = max((m for m in (_moment(line.get("at")) for line in since) if m), default=None)
             running.append((relative.rsplit("/", 1)[-1].removesuffix(".jsonl"), last))
     return running
 

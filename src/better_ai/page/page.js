@@ -64,7 +64,8 @@ function pageFetch(url, init) {
 // that state, or null), mark_age (seconds since the driver last marked itself alive), approvals (each { id, who, tool,
 // arguments, summary, since, options }), workers (each { name, item, waiting }) and blocked (each { tool, arguments,
 // reason }). The page shows what it says and adds nothing: the notice and Stop or Start in the Agents section, a waiting
-// worker's row, the tab title, and each request in one pop-up.
+// worker's row, the tab title, and each request in one pop-up. problems (each { file, line, text }) lists the record lines
+// the driver could not read.
 var PAGE_DRIVER_DOWN = "The page's agent driver stopped. Ask the agent in your chat to serve this page again.";
 var PAGE_OWN_WAITING = "The page's agent is waiting for you to allow a tool call. Open the request to answer it.";
 var PAGE_UNSENT = 'May not have been sent; check after the page reopens.';
@@ -1315,7 +1316,10 @@ function pageAgents(rows, o) {
   // A request from an agent that has no row here, the page's own, has no row to press: a row with its sentence and a button
   // instead. It is not the state notice, which narrow windows show in the pinned bar, so it stays in the list at every width.
   var own = pageApprovals().filter(function (a) { return !(pageAgentState.workers || []).some(function (w) { return w.name === a.who; }); })[0];
+  // Each record line the scan could not read is one fixed sentence (decision D21).
+  var problems = pageAgentState && !pageDriverDown ? (pageAgentState.problems || []) : [];
   var list = (notice ? '<li class="notice" role="status"><div>' + pageEscape(notice) + '</div></li>' : '') +
+    problems.map(function (p) { return '<li class="notice" role="status"><div>' + pageEscape("A line in " + p.file + " can't be read. Ask the agent to fix it.") + '</div></li>'; }).join('') +
     (own ? '<li><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
     rows.map(function (r) {
     var waits = waiting.indexOf(r.who) >= 0;

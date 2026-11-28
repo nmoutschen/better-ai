@@ -4,7 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -54,7 +54,7 @@ class SkillDrivingTest(unittest.TestCase):
         self.write(unit, "logs/builder.jsonl", step, handback, later)
         ids = self.trigger_ids(unit)
         self.assertEqual(len(set(ids)), 2)
-        self.write(unit, "logs/builder.jsonl", step, handback, later, step)
+        self.write(unit, "logs/builder.jsonl", step, step, handback, later)
         self.assertEqual(self.trigger_ids(unit), ids)
         self.write(unit, "logs/builder.jsonl", later, step, step, handback)
         self.assertEqual(sorted(self.trigger_ids(unit)), sorted(ids))
@@ -62,7 +62,8 @@ class SkillDrivingTest(unittest.TestCase):
     def test_research_stop_and_checked_wake_but_strategy_does_not(self):
         unit = self.unit(RESEARCH)
         self.write(unit, "claims/C-verifier-1.json", {"type": "claim", "id": "C-verifier-1"})
-        base = {"at": AT, "by": "worker"}
+        # Lines after the stop are the worker running again, so they are recent: nothing is overdue.
+        base = {"at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "by": "worker"}
         self.write(
             unit,
             "logs/worker.jsonl",
