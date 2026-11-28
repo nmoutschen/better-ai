@@ -100,7 +100,14 @@ class CloseAndReopen(unittest.TestCase):
 
         specs = dict(page.PAGES)
         specs.setdefault("design-better", canvas.SPEC)
-        names = {"architect-better", "code-better", "design-better", "discover-better", "research-better", "show-better"}
+        names = {
+            "architect-better",
+            "code-better",
+            "design-better",
+            "discover-better",
+            "research-better",
+            "show-better",
+        }
         self.assertLessEqual(names, set(specs))
         for name in sorted(names):
             spec = specs[name]
