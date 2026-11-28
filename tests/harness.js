@@ -52,7 +52,7 @@ function loadBoard(returns, over = {}) {
   const env = Object.assign({
     document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents, pageOpenDecisions: page.pageOpenDecisions,
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime,
-    pageEscape: page.pageEscape, pageAgents: page.pageAgents, pagePopup: page.pagePopup, pageShowErrors: page.pageShowErrors,
+    pageEscape: page.pageEscape, pageAgents: page.pageAgents, pageApprovals: page.pageApprovals, pageOpenApproval: page.pageOpenApproval, pagePopup: page.pagePopup, pageShowErrors: page.pageShowErrors,
     addEventListener: () => {}, innerWidth: 1000, innerHeight: 800, getComputedStyle: stand(),
     pageFetch: () => new Promise(() => {}), setInterval: () => {},
   }, over);

@@ -400,13 +400,13 @@ test('a rejected event is undone on the page: the model is rebuilt from the log,
   assert.match(els['.toast'].textContent, /on\.slide: required/);
 });
 
-test('when the server cannot be reached the page says the page is closed, and keeps the text too', async () => {
+test('when the server cannot be reached the page says the send may not have arrived, and keeps the text too', async () => {
   const { els, resets } = conversationOn(unreachable);
   els['#note'].value = 'my words';
   els['.notes .send .btn'].listeners.click({ preventDefault() {} });
   await nextTick();
   assert.equal(els['#note'].value, 'my words');
-  assert.match(els['.toast'].textContent, /closed/);
+  assert.equal(els['.toast'].textContent, 'May not have been sent; check after the page reopens.');
   assert.equal(resets.length, 1);
 });
 

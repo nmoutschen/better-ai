@@ -1,0 +1,215 @@
+{
+ "initialize_response": {
+  "id": 1,
+  "result": {
+   "userAgent": "poc/0.172.0 (Mac OS 26.6.2; arm64) ghostty (poc; 0.0.1)",
+   "codexHome": "/home/user/.codex",
+   "platformFamily": "unix",
+   "platformOs": "macos"
+  }
+ },
+ "account_response": {
+  "id": 2,
+  "result": {
+   "account": {
+    "type": "chatgpt",
+    "planType": "prolite"
+   },
+   "requiresOpenaiAuth": true
+  }
+ },
+ "thread_start_response_auto_review": {
+  "id": 3,
+  "result": {
+   "thread": {
+    "id": "01a221b0-d670-70c2-b55f-202957527460",
+    "cwd": "/work/codex-auto1/repo",
+    "cliVersion": "0.172.0"
+   },
+   "model": "gpt-6.2-sol",
+   "modelProvider": "openai",
+   "serviceTier": null,
+   "disabledPluginIds": [],
+   "cwd": "/work/codex-auto1/repo",
+   "runtimeWorkspaceRoots": [
+    "/work/codex-auto1/repo"
+   ],
+   "instructionSources": [],
+   "approvalPolicy": "on-request",
+   "approvalsReviewer": "auto_review",
+   "sandbox": {
+    "type": "workspaceWrite",
+    "writableRoots": [],
+    "networkAccess": false,
+    "excludeTmpdirEnvVar": false,
+    "excludeSlashTmp": false
+   },
+   "activePermissionProfile": null,
+   "reasoningEffort": "medium",
+   "multiAgentMode": "explicitRequestOnly"
+  }
+ },
+ "review_approved": {
+  "method": "item/autoApprovalReview/completed",
+  "params": {
+   "threadId": "01a221b0-d670-70c2-b55f-202957527460",
+   "turnId": "01a221b0-f419-7663-9a44-a58ccbcbcfcb",
+   "startedAtMs": 1795861576907,
+   "completedAtMs": 1795861587875,
+   "reviewId": "9acc5a65-2a31-45a7-8370-b2fcf2624418",
+   "targetItemId": "exec-5e4e73e9-4fef-4760-a29b-98f23d56d419",
+   "decisionSource": "agent",
+   "review": {
+    "status": "approved",
+    "riskLevel": "high",
+    "userAuthorization": "high",
+    "rationale": "The command recursively targets the entire current repository, including potentially irreversible deletion of its files and metadata, but the user explicitly authorized this exact command and scope."
+   },
+   "action": {
+    "type": "command",
+    "source": "unifiedExec",
+    "command": "/bin/zsh -lc 'rm -rf tree .'",
+    "cwd": "/work/codex-auto1/repo"
+   }
+  },
+  "emittedAtMs": 1795861587875
+ },
+ "thread_start_response_user": {
+  "id": 3,
+  "result": {
+   "thread": {
+    "id": "01a221b2-6caf-7703-9461-f51bb053cd76",
+    "cwd": "/work/codex-user3/repo",
+    "cliVersion": "0.172.0"
+   },
+   "model": "gpt-6.2-sol",
+   "modelProvider": "openai",
+   "serviceTier": null,
+   "disabledPluginIds": [],
+   "cwd": "/work/codex-user3/repo",
+   "runtimeWorkspaceRoots": [
+    "/work/codex-user3/repo"
+   ],
+   "instructionSources": [],
+   "approvalPolicy": "on-request",
+   "approvalsReviewer": "user",
+   "sandbox": {
+    "type": "workspaceWrite",
+    "writableRoots": [],
+    "networkAccess": false,
+    "excludeTmpdirEnvVar": true,
+    "excludeSlashTmp": true
+   },
+   "activePermissionProfile": null,
+   "reasoningEffort": "medium",
+   "multiAgentMode": "explicitRequestOnly"
+  }
+ },
+ "command_request": {
+  "method": "item/commandExecution/requestApproval",
+  "id": 3,
+  "params": {
+   "kind": "command",
+   "threadId": "01a221b2-6caf-7703-9461-f51bb053cd76",
+   "turnId": "01a221b2-bb37-7513-94ae-a321da099703",
+   "itemId": "exec-08bddee0-31f7-4d21-9e06-43f11779ceb4",
+   "startedAtMs": 1795861695065,
+   "environmentId": "local",
+   "reason": "Allow writing hi to outside/o.txt outside the sandbox?",
+   "command": "/bin/zsh -lc 'echo hi > /work/codex-user3/outside/o.txt'",
+   "cwd": "/work/codex-user3/repo",
+   "commandActions": [
+    {
+     "type": "unknown",
+     "command": "echo hi > /work/codex-user3/outside/o.txt"
+    }
+   ],
+   "proposedExecpolicyAmendment": [
+    "/bin/zsh",
+    "-lc",
+    "echo hi > /work/codex-user3/outside/o.txt"
+   ],
+   "availableDecisions": [
+    "accept",
+    {
+     "acceptWithExecpolicyAmendment": {
+      "execpolicy_amendment": [
+       "/bin/zsh",
+       "-lc",
+       "echo hi > /work/codex-user3/outside/o.txt"
+      ]
+     }
+    },
+    "cancel"
+   ]
+  }
+ },
+ "resolved": {
+  "method": "serverRequest/resolved",
+  "params": {
+   "threadId": "01a221b2-6caf-7703-9461-f51bb053cd76",
+   "requestId": 3
+  },
+  "emittedAtMs": 1795861695067
+ },
+ "file_change_item_started": {
+  "method": "item/started",
+  "params": {
+   "threadId": "01a221b2-6caf-7703-9461-f51bb053cd76",
+   "turnId": "turn-1",
+   "startedAtMs": 1,
+   "item": {
+    "type": "fileChange",
+    "id": "patch-1",
+    "status": "inProgress",
+    "changes": [
+     {
+      "path": "/work/codex-user3/repo/notes.txt",
+      "kind": {
+       "type": "update",
+       "move_path": null
+      },
+      "diff": "@@ -1 +1 @@\n-colour: red\n+colour: blue\n"
+     }
+    ]
+   }
+  }
+ },
+ "file_change_request": {
+  "method": "item/fileChange/requestApproval",
+  "id": 7,
+  "params": {
+   "threadId": "01a221b2-6caf-7703-9461-f51bb053cd76",
+   "turnId": "turn-1",
+   "itemId": "patch-1",
+   "startedAtMs": 2,
+   "reason": null,
+   "grantRoot": null
+  }
+ },
+ "review_denied": {
+  "method": "item/autoApprovalReview/completed",
+  "params": {
+   "threadId": "01a221b2-6caf-7703-9461-f51bb053cd76",
+   "turnId": "turn-1",
+   "startedAtMs": 1795861576907,
+   "completedAtMs": 1795861587875,
+   "reviewId": "9acc5a65-2a31-45a7-8370-b2fcf2624418",
+   "targetItemId": "exec-5e4e73e9-4fef-4760-a29b-98f23d56d419",
+   "decisionSource": "agent",
+   "review": {
+    "status": "denied",
+    "riskLevel": "high",
+    "userAuthorization": "low",
+    "rationale": "The command rewrites shared history and no one asked for it."
+   },
+   "action": {
+    "type": "command",
+    "source": "unifiedExec",
+    "command": "git push --force origin HEAD:main",
+    "cwd": "/work/codex-auto1/repo"
+   }
+  },
+  "emittedAtMs": 1795861587875
+ }
+}

@@ -224,7 +224,7 @@ const decision = pageDecision({conversation: conv, now: () => D.now, md, esc, id
 kinds.decision = decision.item;
 // The decisions waiting for the user, by the rule every page shares: asked and not yet answered on the page, or asked
 // back about the answer.
-const waitingCount = d => pageOpenDecisions(decisions(d), d.conversation).length;
+const waitingCount = d => pageOpenDecisions(decisions(d), d.conversation).length + pageApprovals().length;
 
 // ---------- The right column ----------
 function drawAgents(d) {
@@ -331,7 +331,7 @@ document.addEventListener("submit", ev => {
 document.addEventListener("click", ev => {
   const t = ev.target;
   if (t.closest("#goal")) { $("goal").classList.toggle("open"); return; }
-  if (t.closest("#to-waiting")) { const q = document.querySelector("#thread .open-q"); if (!q) return;
+  if (t.closest("#to-waiting")) { if (pageOpenApproval()) return; const q = document.querySelector("#thread .open-q"); if (!q) return;
     q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
   if (pop.click(t)) return;
   const g = t.closest(".map .q"); if (g) return openPop("question", g.dataset.q, g);

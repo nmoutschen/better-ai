@@ -15,7 +15,7 @@ function wholeBoard(snapshot) {
   const page = loadPage();
   const document = new Proxy(stand(), { get: (t, k) => (k === 'getElementById' ? id => (id === 'page-data' ? (snapshot ? { textContent: JSON.stringify(snapshot) } : null) : stand()) : t[k]) });
   const env = { document, pageConversation: o => { seen.conversation = o; return stand(); }, pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents, pageOpenDecisions: page.pageOpenDecisions,
-    pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape, pageAgents: page.pageAgents, pagePopup: page.pagePopup,
+    pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape, pageAgents: page.pageAgents, pageApprovals: page.pageApprovals, pageOpenApproval: page.pageOpenApproval, pagePopup: page.pagePopup,
     pageShowErrors: (band, errors, note) => seen.bands.push([errors, note]), addEventListener: () => {}, innerWidth: 1000, innerHeight: 800,
     getComputedStyle: stand(), pageFetch: () => new Promise(() => {}), setInterval: () => {} };
   new Function(...Object.keys(env), read('research', 'board.js'))(...Object.values(env));

@@ -57,26 +57,63 @@ test('only a registered opaque local frame can bind its document port once', () 
 });
 
 test('only bounded local click details open a draft and parent supplies the version', () => {
-  const fn = new Function('openPop', 'byId', 'pop', 'menu', 'labels', 'commenting', 'comments', 'conv', between(read('design', 'canvas.js'), '  function fraction', '  if (typeof pageDriven') .replace(/^\(n\)/, 'function fraction(n)') + ';return fromMock');
+  const clock = { t: 1000 }, dialogs = [];
+  const fn = new Function('openPop', 'byId', 'pop', 'menu', 'labels', 'commenting', 'comments', 'conv', 'Date', 'document', 'pageDialog', 'pageDialogClose', 'pageEl',
+    between(read('design', 'canvas.js'), '  function fraction', '  if (typeof pageDriven') .replace(/^\(n\)/, 'function fraction(n)') + ';return fromMock');
   const calls = [], item = {id: 'x', version: 'A'}, frame = {dataset: {i: '0'}, clientWidth: 320, clientHeight: 800};
   const states = {}, reopened = [];
-  const handle = fn((...args) => calls.push(args), id => id === 'x' && item, {hidden: true}, {hidden: true}, ['A'], true, {state: () => states}, {reopen: id => reopened.push(id)});
+  const handle = fn((...args) => calls.push(args), id => id === 'x' && item, {hidden: true}, {hidden: true}, ['A'], true, {state: () => states}, {reopen: id => reopened.push(id)},
+    { now: () => clock.t }, { activeElement: null }, o => dialogs.push(o), () => {}, (tag, cls, text) => ({ tag, cls, text }));
+  const point = () => handle(frame, {kind: 'pointer'});
   const click = {kind: 'click', x: 13, y: 17, selector: '#lead', text: 'Lead', tag: 'p', fx: 0, fy: 1};
-  for (const changes of [{kind:'rpc'}, {kind:'approve'}, {x: Infinity}, {x: 321}, {fy: '1'}, {id: 'absent'}, {text: {}}]) handle(frame, {...click, ...changes});
+  const press = more => { point(); handle(frame, {...click, ...more}); };
+  for (const changes of [{kind:'rpc'}, {kind:'approve'}, {x: Infinity}, {x: 321}, {fy: '1'}, {id: 'absent'}, {text: {}}]) press(changes);
   assert.equal(calls.length, 0);
-  handle(frame, {...click, version: 'B', method: 'approve'});
+  press({version: 'B', method: 'approve'});
   assert.deepEqual(calls[0], [frame, null, {fx:0, fy:1}, 13, 17, null, {selector:'#lead', tag:'p', text:'Lead'}]);
-  handle(frame, {...click, id:'x'});
+  press({id:'x'});
   assert.equal(calls[1][5], item);
-  for (const state of ['done', 'accepted']) {
-    states.x = state;
-    item.version = 'B';
-    handle(frame, {...click, id:'x'});
-    item.version = 'A';
-    handle(frame, {...click, id:'x'});
-  }
-  assert.deepEqual(reopened, ['x', 'x']);
+  states.x = 'done';
+  item.version = 'B';
+  press({id:'x'});
+  item.version = 'A';
+  press({id:'x'});
+  assert.deepEqual(reopened, ['x'], 'a done comment goes straight to the reply');
   assert.equal(calls.length, 2);
+  // An accepted comment is reopened only after the user confirms in the page.
+  states.x = 'accepted';
+  press({id:'x'});
+  assert.equal(dialogs.length, 1);
+  assert.equal(dialogs[0].title, 'Reopen this accepted comment?');
+  assert.deepEqual(dialogs[0].buttons.map(b => b.text), ['Reopen', 'Cancel']);
+  assert.deepEqual(reopened, ['x']);
+  dialogs[0].buttons[1].click();
+  assert.deepEqual(reopened, ['x'], 'Cancel reopens nothing');
+  dialogs[0].buttons[0].click();
+  assert.deepEqual(reopened, ['x', 'x']);
+});
+
+test('a click from a frame acts only within 1 s of a real pointer event on it, once for each', () => {
+  const clock = { t: 5000 };
+  const fn = new Function('openPop', 'byId', 'pop', 'menu', 'labels', 'commenting', 'comments', 'conv', 'Date', 'document', 'pageDialog', 'pageDialogClose', 'pageEl',
+    between(read('design', 'canvas.js'), '  function fraction', '  if (typeof pageDriven') .replace(/^\(n\)/, 'function fraction(n)') + ';return fromMock');
+  const calls = [], frame = {dataset: {i: '0'}, clientWidth: 320, clientHeight: 800}, other = {dataset: {i: '0'}, clientWidth: 320, clientHeight: 800};
+  const handle = fn((...args) => calls.push(args), () => null, {hidden: true}, {hidden: true}, ['A'], true, {state: () => ({})}, {}, { now: () => clock.t }, {}, () => {}, () => {}, () => ({}));
+  const click = {kind: 'click', x: 1, y: 1, selector: 'p', text: 'T', tag: 'p', fx: 0, fy: 0};
+  handle(frame, click);
+  assert.equal(calls.length, 0, 'a click with no pointer event before it changes nothing');
+  handle(frame, {kind: 'pointer'});
+  clock.t += 1001;
+  handle(frame, click);
+  assert.equal(calls.length, 0, 'a pointer event more than 1 s old does not count');
+  handle(frame, {kind: 'pointer'});
+  clock.t += 999;
+  handle(other, click);
+  assert.equal(calls.length, 0, 'a pointer event on another frame does not count');
+  handle(frame, click);
+  assert.equal(calls.length, 1, 'within 1 s');
+  handle(frame, click);
+  assert.equal(calls.length, 1, 'the same gesture acts once');
 });
 
 test('the packaged bridge uses its port for clicks, pin editing, shortcuts and scroll', () => {
@@ -110,6 +147,10 @@ test('the packaged bridge uses its port for clicks, pin editing, shortcuts and s
   assert.equal(sent[0][1], 'http://127.0.0.1:3200');
   assert.equal(sent[0][2][0], channel.port2);
   const event = {target:element, clientX:10, clientY:30, preventDefault() {}, stopPropagation() {}};
+  handlers.pointerup({...event, isTrusted:false});
+  assert.equal(messages.length, 0);
+  handlers.pointerup({...event, isTrusted:true});
+  assert.equal(JSON.stringify(messages.splice(0)), '[{"kind":"pointer"}]');
   handlers.click(event);
   assert.equal(messages.length, 0);
   handlers.click({...event, isTrusted:true});

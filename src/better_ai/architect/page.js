@@ -455,7 +455,7 @@ function start(data) {
       commentsById = new Map(model.entries.filter(entry => entry.kind === 'comment' && !entry.deleted)
         .map(entry => [entry.e.id, entry.e]));
       openComments.textContent = open.length;
-      openQuestions.textContent = pageOpenDecisions([], log, items, waiting).length;
+      openQuestions.textContent = pageOpenDecisions([], log, items, waiting).length + pageApprovals().length;
       const counts = new Map();
       for (const {e} of open) {
         const key = locate(e)?.closest('[role="tabpanel"]')?.id.slice(6);
@@ -589,6 +589,7 @@ function start(data) {
   window.addEventListener('resize', placePins);
 
   byId('questions').addEventListener('click', () => {
+    if (pageOpenApproval()) return;
     const model = pageThread(conversation.log(), items, waiting, true);
     const entry = model.entries.find(c => !c.deleted && waiting(c, model.state));
     if (entry) showConversation(entry.e.id);
