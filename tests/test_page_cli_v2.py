@@ -255,21 +255,23 @@ class StartTest(Unit):
         log = (self.folder / ".driver.log").read_text()
         self.assertNotIn('"type": "note"', log)
 
-    def test_unit_gitignore_lists_the_driver_files(self):  # S143
+    def test_unit_gitignore_lists_the_driver_files(self):  # S143, N4
         self.served()
         self.assertEqual(
-            (self.folder / ".gitignore").read_text().splitlines()[-2:],
-            [".driver", ".driver.log"],
+            (self.folder / ".gitignore").read_text().splitlines()[-5:],
+            [".driver", ".driver.log", ".page-link", ".page-delivery", ".page-serve-lock"],
         )
         listed = subprocess.run(
             ["git", "status", "--porcelain", "--untracked-files=all"], cwd=self.root, capture_output=True, text=True
         ).stdout
         self.assertNotIn(".driver", listed)
+        self.assertNotIn(".page-", listed)
 
     def test_gitignore_that_lists_them_is_left_alone(self):  # S143
-        (self.folder / ".gitignore").write_text("x\n.driver\n.driver.log\n")
+        text = "x\n.driver\n.driver.log\n.page-link\n.page-delivery\n.page-serve-lock\n"
+        (self.folder / ".gitignore").write_text(text)
         self.served()
-        self.assertEqual((self.folder / ".gitignore").read_text(), "x\n.driver\n.driver.log\n")
+        self.assertEqual((self.folder / ".gitignore").read_text(), text)
 
     def test_serve_returns_and_the_server_goes_on_in_its_own_session(self):  # S91
         started = time.monotonic()

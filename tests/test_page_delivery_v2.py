@@ -271,8 +271,13 @@ class WhatATurnCarries(Turns):
         eventually(lambda: driver.agent()["state"] == "failed")
         body = driver.agent()
         self.assertEqual(body["kind"], "not-handling")
-        self.assertIn("ignored", body["text"])
         failed = self.records("state")[-1]
+        # D30: the notice's one value is the log's path; the items, the final message and the denied calls are there.
+        self.assertEqual(
+            body["text"],
+            "All agents are stopped because they did not handle your message. Their last reply and denied calls are in "
+            f"{failed['log']}. Press Start to retry, or reword your message.",
+        )
         self.assertEqual(failed["items"], ["ignored"])
         self.assertEqual(failed["final_message"], "I looked at it.")
         self.assertEqual(failed["denied"], [])

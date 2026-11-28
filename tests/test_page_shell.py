@@ -816,6 +816,47 @@ class EndingTest(Fixture):
         self.assertFalse(stopper.is_alive(), "the server waits for no more than the page's poll of closed")
 
 
+class LinkReplyTest(Fixture):
+    def reply_to_link(self, reply):
+        """link_request against a socket that answers REPLY, as the unit's server does."""
+        from better_ai.page.driver_state import write_private
+
+        folder = tempfile.TemporaryDirectory(prefix="better-page-", dir="/tmp")
+        self.addCleanup(folder.cleanup)
+        path = os.path.join(folder.name, "link")
+        listener = socket.socket(socket.AF_UNIX)
+        self.addCleanup(listener.close)
+        listener.bind(path)
+        listener.listen(1)
+
+        def answer():
+            connection, _ = listener.accept()
+            with connection:
+                connection.makefile("rb").readline()
+                connection.sendall(reply.encode() + b"\n")
+
+        thread = threading.Thread(target=answer, daemon=True)
+        thread.start()
+        unit = self.unit()
+        write_private(unit, page.LINK_SOCKET, path.encode())
+        answered = page.link_request(unit)
+        thread.join(5)
+        return answered
+
+    def test_link_passes_on_every_kind_the_server_answers_N7(self):
+        for reply in (
+            "on",
+            "off no-browser: could not open a browser on this machine; run link where your browser runs",
+            "off timeout: the new tab did not open the page in time; the old tab is still paired",
+            "off no-server: the page server could not open a tab; run serve again",
+        ):
+            with self.subTest(reply):
+                self.assertEqual(self.reply_to_link(reply), reply)
+
+    def test_link_does_not_pass_on_an_answer_of_another_shape(self):
+        self.assertRegex(self.reply_to_link("refused"), r"^off no-server: no page is being served for ")
+
+
 class FakeDriverShapeTest(unittest.TestCase):
     def test_each_fake_driver_has_the_members_of_driver_in_the_same_shape(self):
         """A fake that calls a property as a method, or the reverse, hides a TypeError of the real one (B2)."""
