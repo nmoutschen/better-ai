@@ -33,9 +33,11 @@ def _design_parts(context: Context) -> tuple[set[str], list[str]] | None:
     for flow in design.get("flows") if isinstance(design.get("flows"), list) else []:
         if isinstance(flow, dict) and isinstance(flow.get("id"), str):
             flow_ids.append(flow["id"])
-            for step in flow.get("steps") if isinstance(flow.get("steps"), list) else []:
-                if isinstance(step, dict) and isinstance(step.get("id"), str):
-                    keys.add(f"step:{flow['id']}/{step['id']}")
+            # A sequence flow's steps, or a logic flow's nodes and edges: each is a step of its flow.
+            for field in ("steps", "nodes", "edges"):
+                for step in flow.get(field) if isinstance(flow.get(field), list) else []:
+                    if isinstance(step, dict) and isinstance(step.get("id"), str):
+                        keys.add(f"step:{flow['id']}/{step['id']}")
     return keys, flow_ids
 
 
@@ -160,20 +162,38 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
         for key in ("from", "to"):
             reference(edge, key, node_ids, "Edge", f"containers.edges[{number}]")
     members: set = set()
+    kind_of = {group["id"]: group.get("kind") or "boundary" for group in groups}
     for number, group in enumerate(groups):
+        kind = kind_of[group["id"]]
         for member in group["members"]:
             if member not in node_ids:
                 problems.append(
                     (f"containers.groups[{number}].members", f"Group {group['id']!r}: missing member {member!r}")
                 )
-            if member in members:
+            if (kind, member) in members:
                 problems.append(
                     (
                         f"containers.groups[{number}].members",
-                        f"Box {member!r} belongs to more than one group or is listed twice",
+                        f"Box {member!r} belongs to more than one group of kind {kind}, or is listed twice",
                     )
                 )
-            members.add(member)
+            members.add((kind, member))
+        within = group.get("within")
+        if within is not None and kind_of.get(within) != kind:
+            problems.append(
+                (
+                    f"containers.groups[{number}].within",
+                    f"Group {group['id']!r}: within names {within!r}, which is not a {kind} group",
+                )
+            )
+    parent = {group["id"]: group.get("within") for group in groups}
+    for number, group in enumerate(groups):
+        seen, at = {group["id"]}, parent.get(group["id"])
+        while at in parent and at not in seen:
+            seen.add(at)
+            at = parent[at]
+        if at == group["id"]:
+            problems.append((f"containers.groups[{number}].within", f"Group {group['id']!r}: within forms a cycle"))
     alternatives = design.get("alternatives") or []
     versions = {"before", "after"} | set(index(alternatives, "Alternatives", "alternatives"))
     for number, alternative in enumerate(alternatives):
@@ -190,12 +210,16 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
             versions_of(item, f"containers.{kind}[{number}]")
     for number, flow in enumerate(design.get("flows", [])):
         versions_of(flow, f"flows[{number}]")
-        for key in ("participants", "steps"):
+        for key in ("nodes", "edges") if is_logic(flow) else ("participants", "steps"):
             for at, item in enumerate(flow[key]):
                 if isinstance(item, dict):
                     versions_of(item, f"flows[{number}].{key}[{at}]")
+    drawn = ["before", *(alternative["id"] for alternative in alternatives)] if alternatives else ["before", "after"]
     for number, flow in enumerate(design.get("flows", [])):
         where = f"Flow {number + 1}"
+        if is_logic(flow):
+            problems += _logic_problems(flow, number, node_ids, drawn, index, reference)
+            continue
         participants = []
         for at, participant in enumerate(flow["participants"]):
             if isinstance(participant, dict):
@@ -210,6 +234,91 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
         for at, step in enumerate(flow["steps"]):
             for key in ("from", "to"):
                 reference(step, key, participant_ids, f"{where} step", f"flows[{number}].steps[{at}]")
+    return problems
+
+
+def is_logic(flow: dict) -> bool:
+    """Whether a flow is a logic flow (nodes and edges) rather than a sequence flow (participants and steps)."""
+    return flow.get("kind") == "logic"
+
+
+def exists_in(item: dict, state: str) -> bool:
+    """Whether a part exists in a version: `in` lists them, `after` standing for every version after the change."""
+    where = item.get("in")
+    return where is None or state in where or (state != "before" and "after" in where)
+
+
+def _logic_problems(flow, number, box_ids, drawn, index, reference) -> list[tuple[str, str]]:
+    """What is wrong in a logic flow: ids used twice among its nodes and edges, an edge or a `by` that names nothing,
+    not one start, a decision without two labelled outcomes, an exit with an outgoing edge, and, in each version the
+    flow is drawn in, a node the start cannot reach or that cannot reach an exit."""
+    problems: list[tuple[str, str]] = []
+    where, field = f"Flow {number + 1}", f"flows[{number}]"
+    nodes, edges = flow["nodes"], flow["edges"]
+    index(nodes, f"{where} nodes", f"{field}.nodes")
+    node_and_edge = index(edges, f"{where} edges", f"{field}.edges") & {node["id"] for node in nodes}
+    for at, edge in enumerate(edges):
+        if edge["id"] in node_and_edge:
+            problems.append((f"{field}.edges[{at}].id", f"{where} edges: Duplicate id {edge['id']!r} (also a node)"))
+    node_ids = {node["id"] for node in nodes}
+    kinds = {node["id"]: node["type"] for node in nodes}
+    for at, node in enumerate(nodes):
+        if node.get("by") is not None:
+            reference(node, "by", box_ids, f"{where} node", f"{field}.nodes[{at}]")
+    for at, edge in enumerate(edges):
+        for key in ("from", "to"):
+            reference(edge, key, node_ids, f"{where} edge", f"{field}.edges[{at}]")
+    for at, edge in enumerate(edges):
+        if kinds.get(edge["from"]) == "exit":
+            problems.append((f"{field}.edges[{at}]", f"{where} edge {edge['id']!r}: an exit has no outgoing edge"))
+
+    found: dict[tuple[str, str, str], list[str]] = {}
+    for state in drawn:
+        if not exists_in(flow, state):
+            continue
+        here = {node["id"] for node in nodes if exists_in(node, state)}
+        starts = [node["id"] for node in nodes if node["type"] == "start" and node["id"] in here]
+        if len(starts) != 1:
+            found.setdefault(("", "flow", f"needs exactly one start node, has {len(starts)}"), []).append(state)
+        links = [e for e in edges if exists_in(e, state) and e["from"] in here and e["to"] in here]
+        outgoing: dict[str, list[dict]] = {}
+        for edge in links:
+            outgoing.setdefault(edge["from"], []).append(edge)
+        for node in sorted(here):
+            if kinds[node] != "decision":
+                continue
+            out = outgoing.get(node, [])
+            if len(out) < 2:
+                found.setdefault((node, "decision", "needs two outcomes or more, each with a label"), []).append(state)
+            for edge in out:
+                if not edge.get("label"):
+                    message = f"outcome {edge['id']!r} needs a label"
+                    found.setdefault((node, "decision", message), []).append(state)
+        if len(starts) != 1:
+            continue
+        reached, pending = set(), [starts[0]]
+        while pending:
+            node = pending.pop()
+            if node not in reached:
+                reached.add(node)
+                pending += [edge["to"] for edge in outgoing.get(node, [])]
+        incoming: dict[str, list[str]] = {}
+        for edge in links:
+            incoming.setdefault(edge["to"], []).append(edge["from"])
+        ending, pending = set(), [node for node in here if kinds[node] == "exit"]
+        while pending:
+            node = pending.pop()
+            if node not in ending:
+                ending.add(node)
+                pending += incoming.get(node, [])
+        for node in sorted(here):
+            if node not in reached:
+                found.setdefault((node, "node", "cannot be reached from the start"), []).append(state)
+            elif node not in ending:
+                found.setdefault((node, "node", "cannot reach an exit"), []).append(state)
+    for (node, what, message), states in found.items():
+        subject = f"{where}" if what == "flow" else f"{where} {what} {node!r}"
+        problems.append((f"{field}.nodes", f"{subject}: {message} (in {', '.join(states)})"))
     return problems
 
 

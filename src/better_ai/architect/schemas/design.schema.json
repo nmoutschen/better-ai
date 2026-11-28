@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "design.schema.json",
   "title": "design.json: the containers and flows the page draws",
-  "$comment": "Only the diagrams. Every flow has an id, so a part key never depends on a flow's position. The design-references hook of the architect package checks what the shape cannot: that an edge, a group, a participant or a step names what exists, that an id is used once, and that a box kind is in the register (kinds.json), and that `in` names only `before`, `after` or an alternative.",
+  "$comment": "Only the diagrams. Every flow has an id, so a part key never depends on a flow's position. A flow is a sequence flow (participants and steps) or, with kind `logic`, a logic flow (nodes and edges: a process with decisions, loops back and exits, or a lifecycle of states); the renderer finds the loops back. A group has a kind: `boundary` (the default), `trust` or `runs` (where boxes run), and `within` nests it in a group of its kind. The design-references hook of the architect package checks what the shape cannot: that an edge, a group, a participant, a step, a node or a `by` names what exists, that an id is used once, that a box kind is in the register (kinds.json), that `in` names only `before`, `after` or an alternative, that a box is in one group per kind, and that a logic flow has one start, decisions with two labelled outcomes and no node that cannot be reached or cannot reach an exit.",
   "x-files": [
     "design.json"
   ],
@@ -140,6 +140,23 @@
               },
               "in": {
                 "$ref": "#/$defs/in"
+              },
+              "kind": {
+                "description": "what the group shows: `boundary` (a system boundary, the default), `trust` (a trust boundary) or `runs` (where its boxes run, such as a region, a zone or a host)",
+                "enum": [
+                  "boundary",
+                  "trust",
+                  "runs",
+                  null
+                ]
+              },
+              "within": {
+                "description": "the id of the group of the same kind this group sits inside",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[^\\s:+/]+$"
               }
             }
           }
@@ -153,9 +170,7 @@
         "additionalProperties": false,
         "required": [
           "id",
-          "name",
-          "participants",
-          "steps"
+          "name"
         ],
         "properties": {
           "id": {
@@ -235,8 +250,208 @@
                 }
               }
             }
+          },
+          "kind": {
+            "description": "`sequence` (the default): participants and steps; `logic`: nodes and edges",
+            "enum": [
+              "sequence",
+              "logic",
+              null
+            ]
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "type": {
+                  "enum": [
+                    "start",
+                    "step",
+                    "decision",
+                    "state",
+                    "exit"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[^\\s:+/]+$",
+                  "description": "the id of the container box that does the step"
+                },
+                "outcome": {
+                  "description": "how an exit ends the flow",
+                  "enum": [
+                    "positive",
+                    "negative",
+                    null
+                  ]
+                },
+                "in": {
+                  "$ref": "#/$defs/in"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "exit"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "label",
+                      "outcome"
+                    ],
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "positive",
+                          "negative"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "enum": [
+                          "step",
+                          "decision",
+                          "state"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "label"
+                    ],
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "from",
+                "to"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "from": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "in": {
+                  "$ref": "#/$defs/in"
+                }
+              }
+            }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "logic"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "nodes",
+                "edges"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "participants"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "steps"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "participants",
+                "steps"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "nodes"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "edges"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
     },
     "alternatives": {

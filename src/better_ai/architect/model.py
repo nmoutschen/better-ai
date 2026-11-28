@@ -19,6 +19,7 @@ from pathlib import Path
 from .. import paths, resources, schema
 from ..paths import Unit
 from . import checks, diagram
+from .checks import is_logic
 
 FILES = (
     "architect.json",
@@ -220,6 +221,12 @@ def diagram_parts(design):
     def ids(view, kind, ident):
         return [diagram.part_id(f"{view}-{state}", kind, ident) for state in states]
 
+    groupings = ["systems", *(key for key, _ in diagram.overlays(design))]
+
+    def container_ids(kind, ident):
+        """A box or an arrow is drawn once per grouping of the Containers view."""
+        return [diagram.part_id(diagram.container_prefix(s, g), kind, ident) for g in groupings for s in states]
+
     nodes = {node["id"]: node for node in design["containers"]["nodes"]}
     for ident, node in nodes.items():
         add(
@@ -228,7 +235,7 @@ def diagram_parts(design):
             {
                 "label": node["label"],
                 "kind": "box",
-                "ids": ids("c", "box", ident),
+                "ids": container_ids("box", ident),
                 "view": "containers",
                 "icon": diagram.glyph(node["kind"]),
             },
@@ -244,11 +251,14 @@ def diagram_parts(design):
                 "route": route,
                 "kind": "edge",
                 "view": "containers",
-                "ids": ids("c", "edge", ident),
+                "ids": container_ids("edge", ident),
             },
         )
     for i, flow in enumerate(design["flows"], 1):
         view = f"flow{i}"  # the drawing's own name for the flow; no stored key uses it
+        if is_logic(flow):
+            logic_parts(flow, view, nodes, add, ids)
+            continue
         participants = {p["id"]: nodes[p["box"]]["label"] for p in flow["participants"]}
         for participant in flow["participants"]:
             parts[f"box:{participant['box']}"]["ids"].extend(ids(view, "box", participant["id"]))
@@ -269,6 +279,40 @@ def diagram_parts(design):
                 },
             )
     return parts, hashes, before
+
+
+def logic_parts(flow, view, boxes, add, ids):
+    """The nodes and edges of a logic flow, each a step of its flow: a node by its label, an edge by the labels of its
+    ends and its own."""
+    nodes = {node["id"]: node for node in flow["nodes"]}
+
+    def name(node):
+        if node["type"] == "start":
+            return "Start"
+        actor = boxes.get(node.get("by"))
+        return node.get("label", "") + (f" ({actor['label']})" if actor else "")
+
+    for item in [*flow["nodes"], *flow["edges"]]:
+        ident = item["id"]
+        if "type" in item:
+            description = f"{name(item)} (Flows, {flow['name']})"
+            label = description
+        else:
+            route = f"{name(nodes[item['from']])} to {name(nodes[item['to']])}"
+            description = f"{item.get('label', '')} (Flows, {flow['name']})"
+            label = f"{route}: {description}"
+        add(
+            f"step:{flow['id']}/{ident}",
+            item,
+            {
+                "label": label,
+                "description": description,
+                "kind": "step",
+                "ids": ids(view, "step", ident),
+                "view": "flows",
+                "mark": f"{view}:step:{ident}",
+            },
+        )
 
 
 def _changed(now: dict, previous: dict, before: dict | None) -> list[str]:
@@ -295,12 +339,17 @@ def changed_texts(texts, review, before=None):
 
 
 def render_diagrams(design, marks):
-    """The drawings of each version: the containers, and each flow with how each version shows it (`current`, `new` or
-    `removed`), and an empty drawing in a version that does not draw it."""
+    """The drawings of each version: the containers, each flow with how each version shows it (`current`, `new` or
+    `removed`), and an empty drawing in a version that does not draw it, and the containers in each other grouping
+    the design uses (Trust, Where it runs)."""
     try:
         layout = diagram.layout({**design, "findings": marks})
         states = [state for state, _ in diagram.versions(design)]
         containers = {s: diagram.svg_containers(layout, s) for s in states}
+        overlays = [
+            {"id": key, "name": name, "drawings": {s: diagram.svg_containers(layout, s, key) for s in states}}
+            for key, name in diagram.overlays(design)
+        ]
         flows = [
             {
                 "name": flow["name"],
@@ -313,7 +362,7 @@ def render_diagrams(design, marks):
         ]
     except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"design.json:1: {exc}") from exc
-    return containers, flows
+    return containers, flows, overlays
 
 
 def text_of(record, key, default=""):
@@ -404,10 +453,10 @@ def model(data):
             changes.update(dict.fromkeys(affected + rewritten))
     states = diagram.versions(design) if design else [("before", "Before")]
     versions = [{"id": state, "name": name} for state, name in states]
-    containers, flows = {version["id"]: "" for version in versions}, []
+    containers, flows, overlays = {version["id"]: "" for version in versions}, [], []
     if design:
         try:
-            containers, flows = render_diagrams(design, marks)
+            containers, flows, overlays = render_diagrams(design, marks)
         except ValueError as exc:
             errors.append({"file": "design.json", "line": 1, "field": "(diagram)", "message": str(exc)})
     meta = data["architect"]
@@ -440,6 +489,7 @@ def model(data):
         "versions": versions,
         "alternatives": design.get("alternatives", []) if design else [],
         "containers": containers,
+        "overlays": overlays,
         "flows": flows,
     }
 
