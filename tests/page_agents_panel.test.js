@@ -9,7 +9,7 @@ const { makeDocument, fire, click, h } = require('./fake_dom');
 const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
 const body = over => Object.assign({
   state: 'idle', since: '2026-11-28T10:00:00Z', kind: null, text: null, mark_age: 0.2, approvals: [], workers: [], blocked: [],
-  auto_approved_once: false,
+  auto_approved_once: false, problems: [],
 }, over);
 const approval = over => Object.assign({
   id: 'ap1', who: 'w3', tool: 'Read', arguments: 'example-release-notes.md', summary: 'to read a file',
@@ -712,4 +712,27 @@ test('D18: an /agent body from an older driver, without approvals, workers or bl
   assert.ok(!page.agentsHtml().includes(page.escaped(page.ctx.PAGE_DRIVER_DOWN)), 'the page does not take the driver for gone');
   assert.ok(page.ctx.PAGE_DRIVER_DOWN);
   assert.equal(page.pinbar().querySelector('.agent-ctl').textContent, 'Stop');
+});
+
+test('S118, D21: each record line the scan cannot read is one fixed sentence in the Agents section', async () => {
+  const page = boot();
+  await page.show(body({ problems: [
+    { file: 'logs/b1.jsonl', line: 4, text: '(record): not valid JSON' },
+    { file: 'decisions.jsonl', line: 2, text: '(file): cannot be read' },
+  ] }));
+  const html = page.agentsHtml();
+  for (const file of ['logs/b1.jsonl', 'decisions.jsonl']) {
+    assert.ok(html.includes(page.escaped("A line in " + file + " can't be read. Ask the agent to fix it.")), file);
+  }
+  assert.ok(!html.includes('not valid JSON'), 'the sentence holds the file only');
+  // A file name that holds markup is shown as text.
+  await page.show(body({ problems: [{ file: '<b>x</b>.jsonl', line: 1, text: 'bad' }] }));
+  assert.ok(!page.agentsHtml().includes('<b>x</b>'));
+  // Fixed lines leave the section; an older body with no problems shows none.
+  await page.show(body({ problems: [] }));
+  assert.ok(!page.agentsHtml().includes("can't be read"));
+  const older = body();
+  delete older.problems;
+  await page.show(older);
+  assert.ok(!page.agentsHtml().includes("can't be read"));
 });

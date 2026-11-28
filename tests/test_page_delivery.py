@@ -132,7 +132,7 @@ class DeliveryTest(shell.Fixture):
         self.assertEqual((item["id"], item["status"]), ("m1", "seen"))
         self.assertEqual((event["type"], event["to"]), ("reopen", "m1"))
 
-    def test_rpc_edits_to_excluded_states_reach_pending_and_wait_with_their_state(self):
+    def test_an_rpc_edit_reaches_pending_and_wait_only_while_the_item_is_not_settled(self):
         _, host = self.serve()
         states = ["working", "asked", "done", "accepted"]
         for number, state in enumerate([*states, "stale"], 1):
@@ -150,7 +150,8 @@ class DeliveryTest(shell.Fixture):
                 ),
                 "saved",
             )
-        expected = [(f"c{number}", state, f"edited {state}") for number, state in enumerate(states, 1)]
+        # An edit of a working item is delivered; one of an asked, done or accepted item is not (S15).
+        expected = [("c1", "working", "edited working")]
         for verb, args in (("pending", ()), ("wait", ("--timeout", "1"))):
             with self.subTest(verb=verb):
                 code, out, err = self.cli(verb, self.unit_arg, *args)

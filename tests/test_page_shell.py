@@ -647,7 +647,7 @@ class VerbsTest(Fixture):
                 items = [event for event in map(json.loads, lines[:-1]) if "status" in event]
                 expected = [item for item in case["work"] if item[1] in ("new", "replied", "followup", "reopened")]
                 if case["name"] == "a comment sent again keeps its state, and is the same item":
-                    expected = [["c1", "done"], ["c2", "new"], ["c3", "accepted"]]
+                    expected = [["c2", "new"]]  # an edit of a settled item is not delivered (S15)
                 self.assertEqual([[e["id"], e["status"]] for e in items], expected)
                 self.assertEqual(lines[-1], f"{len(items)} not done.")
                 for name, (item, field, expected) in EXTRAS.items():

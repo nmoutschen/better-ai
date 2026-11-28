@@ -3,6 +3,7 @@ prompt says, which tool calls the driver approves without asking, and the skill 
 
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -13,6 +14,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import test_page_shell as shell
+from test_page_adapters_v2 import CODEX, SESSION, frame, open_claude, open_codex
 from test_page_driver import Event, Peer, eventually, sent
 
 from better_ai import page  # noqa: E402
@@ -376,6 +378,7 @@ class WhenATurnStarts(Turns):
         self.make(handoff="We agreed on A.")
         (prompt,) = self.prompts()
         self.assertIn("We agreed on A.", prompt)
+        self.assertIn("continue from the current step", prompt)
 
     def test_the_first_prompt_holds_everything_the_agent_needs_S27(self):
         self.seed(note("m1"))
@@ -414,11 +417,19 @@ class WhenATurnStarts(Turns):
         prompts = self.prompts(2, self.peers[-1])
         self.assertNotIn("We agreed on A.", prompts[1])
 
-    def test_a_stale_note_from_a_new_serve_says_when_it_was_written_S94(self):
-        self.make(handoff="Old agreement.", resume=False)
+    def test_a_note_kept_from_an_earlier_serve_keeps_the_time_it_was_written_S94(self):
+        first = self.make(handoff="Old agreement.", resume=False)
         (prompt,) = self.prompts()
-        self.assertIn("written", prompt)
-        self.assertIn("Old agreement.", prompt)
+        label = re.search(
+            r"from the chat, written [^;]+; where it differs, the records and your own session are newer", prompt
+        )[0]
+        self.peers[0].events.put(Event("failed", outcome="crashed"))
+        eventually(lambda: first.agent()["state"] == "failed")
+        first.close()
+        time.sleep(1.1)
+        self.make(handoff="")
+        again = self.prompts(1, self.peers[-1])[0]
+        self.assertIn(label + ":\nOld agreement.", again)
 
 
 class WhatAPromptSays(Turns):
@@ -734,7 +745,6 @@ class TheApprovedForm(Turns):
             f"{COMMAND} pending {self.unit_dir}",
             f"{COMMAND} check {self.unit_dir}",
             f"{COMMAND} status {self.unit_dir} seen m1 m2 --by builder-t3",
-            f"{COMMAND} status {self.unit_dir} accepted m1 --text --by builder-t3 <<'EOF'\nyes\nEOF",
             f"{COMMAND} add {self.unit_dir} progress --by builder-t3 <<'EOF'\n{{}}\nEOF",
             f"{COMMAND} set {self.unit_dir} T3 --by builder-t3 --unset note <<'EOF'\n{{}}\nEOF",
             f"{COMMAND} add {self.unit_dir} log --for builder-t3 --by builder-t3 <<'EOF'\n{{}}\nEOF",
@@ -747,6 +757,49 @@ class TheApprovedForm(Turns):
                 answer = next(a for a in self.peers[0].answers() if a[1] == key)
                 self.assertEqual(answer[2:], ("allow_once", "Approved page command"), (command, tool))
         self.assertEqual(driver.agent()["approvals"], [])
+
+    def test_the_requests_claude_code_really_sends_are_approved_or_denied_by_their_form_S9_S78(self):
+        # The input of a Bash request carries description (tests/fixtures/page_wire/claude_2_1_332.json), and may carry timeout.
+        _, adapter, _, _ = open_claude()
+        driver = self.make()
+        form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
+        ok = f"{COMMAND} reply {self.unit_dir} --to m1 --state done --by b <<'EOF'\nIt's done\nEOF"
+        for number, (command, extra, expected) in enumerate(
+            [
+                (ok, {}, ("allow_once", "Approved page command")),
+                (ok, {"timeout": 5000}, ("allow_once", "Approved page command")),
+                (f"{COMMAND} reply .code/rel --to m1", {}, ("deny", f"not-the-approved-form: {form}")),
+                (f"{COMMAND} status {self.unit_dir} accepted m1", {}, ("deny", f"not-the-approved-form: {form}")),
+                (ok, {"run_in_background": True}, None),
+                ("ls", {}, None),
+            ]
+        ):
+            request = frame("bash_prefix_request", request_id=f"r{number}")
+            request["request"]["input"].update({"command": command, **extra})
+            (event,) = adapter.receive(request)
+            self.assertIn("description", event.arguments)
+            self.peers[0].events.put(event)
+            if expected is None:
+                eventually(lambda: len(driver.agent()["approvals"]) == 1)
+                driver.answer_approval(driver.agent()["approvals"][0]["id"], "deny").result(timeout=2)
+                continue
+            eventually(lambda number=number: any(a[1] == f"r{number}" for a in self.peers[0].answers()))
+            answer = next(a for a in self.peers[0].answers() if a[1] == f"r{number}")
+            self.assertEqual(answer[2:], expected, command)
+
+    def test_a_codex_command_request_is_asked_not_approved_or_denied_S9(self):
+        # Codex sends the command wrapped in a login shell (command_request in tests/fixtures/page_wire/codex_0_172_0.json),
+        # so it can never match the form and is asked on the page like any other call; Codex asks only for commands
+        # outside its sandbox (the fixture's reason), not for a write inside the unit.
+        _, adapter, _, _ = open_codex()
+        driver = self.make()
+        request = frame("command_request", CODEX)
+        request["params"]["threadId"] = SESSION
+        request["params"]["command"] = f"/bin/zsh -lc '{COMMAND} pending {self.unit_dir}'"
+        (event,) = adapter.receive(request)
+        self.peers[0].events.put(event)
+        eventually(lambda: len(driver.agent()["approvals"]) == 1)
+        self.assertEqual(self.peers[0].answers(), [])
 
     def test_the_skill_verbs_are_approved_only_where_the_skill_has_them_S9(self):
         form = lambda verb: f"{COMMAND} {verb} {self.unit_dir}"  # noqa: E731
@@ -781,6 +834,9 @@ class TheApprovedForm(Turns):
             f"{COMMAND} reply {self.unit_dir} --by user <<'EOF'\nx\nEOF",
             f"{COMMAND} add {self.unit_dir} decision --for user <<'EOF'\n{{}}\nEOF",
             f"{COMMAND} serve {self.unit_dir}",
+            f"{COMMAND} status {self.unit_dir} accepted m1 --text --by builder-t3 <<'EOF'\nyes\nEOF",
+            f"{COMMAND} status {self.unit_dir} accepted m1 --by builder-t3",
+            f"{COMMAND} reply {self.unit_dir} --to m1 --state accepted --by builder-t3",
             f"{COMMAND} reply {self.unit_dir}/../other --to m1",
             f"/usr/bin/env {COMMAND} pending {self.unit_dir}",
         ]
@@ -833,7 +889,7 @@ class TheApprovedForm(Turns):
         eventually(lambda: any(a[1] == 2 for a in self.peers[0].answers()))
         eventually(lambda: driver.agent()["approvals"])
         self.assertEqual([a["arguments"] for a in driver.agent()["approvals"]], ['{\n  "path": "b"\n}'])
-        self.assertEqual(len(self.records("allowed")), 1)
+        self.assertEqual(len(self.records("asked_again")), 1)
 
 
 class SkillTriggers(unittest.TestCase):
@@ -876,7 +932,7 @@ class SkillTriggers(unittest.TestCase):
         self.write(unit, "logs/b1.jsonl", self.line("b1", "step", recent), raw='{"type": "handed_back", "at": "2026\n')
         found = list(page.spec_of(unit.skill).triggers(unit))
         self.assertEqual([t["type"] for t in found], ["unreadable"])
-        self.assertEqual(found[0]["file"], "logs/b1.jsonl")
+        self.assertEqual((found[0]["file"], found[0]["line"]), ("logs/b1.jsonl", 2))
         self.assertEqual([t["id"] for t in page.spec_of(unit.skill).triggers(unit)], [found[0]["id"]])
         # A record that parses but breaks a rule wakes nothing.
         self.write(unit, "logs/b2.card.json", {"type": "card", "at": AT, "by": "coordinator", "role": "builder"})
@@ -907,6 +963,33 @@ class SkillTriggers(unittest.TestCase):
         self.assertEqual(self.ids(unit), [found["id"]])
         self.write(unit, "logs/b1.jsonl", self.line("b1", "start", old), self.line("b1", "handed_back", result="done"))
         self.assertEqual([t["type"] for t in page.spec_of(unit.skill).triggers(unit)], ["handed_back"])
+
+    def test_a_worker_resumed_after_its_hand_back_is_running_again_S116_S117(self):
+        unit = self.unit(CODE)
+        self.write(unit, "logs/b1.card.json", {"type": "card", "at": AT, "by": "coordinator", "role": "builder"})
+
+        def moment(minutes):
+            return (datetime.now(timezone.utc) - timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        def log(*lines):
+            self.write(
+                unit, "logs/b1.jsonl", *(self.line("b1", kind, moment(ago), **extra) for kind, ago, extra in lines)
+            )
+
+        done = {"result": "done"}
+        log(("start", 90, {}), ("handed_back", 80, done), ("start", 45, {}))
+        (row,) = triggers.workers(unit)
+        self.assertIn(row["silent_min"], (44, 45))
+        overdue = [t for t in page.spec_of(unit.skill).triggers(unit) if t["type"] == "overdue"]
+        self.assertEqual([t["worker"] for t in overdue], ["b1"])
+        # Only the lines after the last hand-back count: its own age, not the first round's.
+        self.assertIn(overdue[0]["silent_min"], (44, 45))
+        log(("start", 90, {}), ("handed_back", 80, done), ("start", 2, {}))
+        (row,) = triggers.workers(unit)
+        self.assertIsNone(row["silent_min"])
+        self.assertEqual([t for t in page.spec_of(unit.skill).triggers(unit) if t["type"] == "overdue"], [])
+        log(("start", 90, {}), ("handed_back", 80, done))
+        self.assertEqual(triggers.workers(unit), [])
 
     def test_a_worker_that_wrote_lately_is_not_overdue_S117(self):
         unit = self.unit(CODE)
@@ -959,6 +1042,30 @@ class TheScan(Turns):
         self.end(self.peers[0])
         self.quiet()
         self.assertEqual(len(self.records("error")), 1)
+
+    def test_the_lines_the_scan_cannot_read_are_listed_in_the_agent_body_while_they_stay_D21(self):
+        driver = self.make()
+        self.assertEqual(driver.agent()["problems"], [])
+        self.scanned = [
+            {
+                "id": "unreadable:x",
+                "type": "unreadable",
+                "file": "logs/b1.jsonl",
+                "line": 4,
+                "problem": "(record): not valid JSON",
+            },
+            {"id": "t9", "type": "handed_back", "file": "logs/b1.jsonl"},
+        ]
+        eventually(lambda: driver.agent()["problems"])
+        self.assertEqual(
+            driver.agent()["problems"], [{"file": "logs/b1.jsonl", "line": 4, "text": "(record): not valid JSON"}]
+        )
+        self.end(self.peers[0])
+        eventually(lambda: self.state()["fired"])
+        # The turn it started is over, but the line is still unreadable, so the page still says so.
+        self.assertEqual(len(driver.agent()["problems"]), 1)
+        self.scanned = []
+        eventually(lambda: driver.agent()["problems"] == [])
 
     def test_a_worker_with_an_open_approval_shows_it_is_waiting_S116(self):
         self.workers = [{"name": "builder-t1", "item": "T1", "waiting": False, "silent_min": None}]
