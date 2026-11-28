@@ -190,8 +190,10 @@ An agent file ADDS:
 ```yaml
 capabilities: [<what it needs, from: read files, run commands, write files, commit, search the web, sub-agents, message the starting agent>]
 edits: <true | false — whether it may change the work it is given>
-model: <cheaper | same | most capable — relative to the agent that starts it>
+model: <the models to use, as examples from more than one vendor, such as "Fable, Astra or similar" or "Sonnet, Terra or similar">
 ```
+
+CHOOSE each agent's model for its own work, not one rule for all agents of a kind. NAME the top tier, such as Fable or Astra, only for work that a strong model misses and where a miss is costly; NAME a cheap or mid-level model, such as Haiku or Sonnet, for mechanical work. BASE the choice on evidence where there is some, such as an eval of the agent on several models.
 
 AFTER the frontmatter, an agent file HAS these sections, in this order: `## Input`, the named fields the starting agent fills in, each required; `## Messages`, only when the agent sends messages while it works or is limited in the messages it may send or act on: what it tells the starting agent, in plain words; `## Output`, what its one hand-back must contain. The input is strict, because the agent sees nothing else. Messages and output are plain language, because how agents talk depends on the harness: the starting agent's skill or mode SAYS how it acts on each kind of message and each outcome.
 

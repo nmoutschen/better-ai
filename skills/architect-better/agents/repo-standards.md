@@ -3,12 +3,12 @@ name: repo-standards
 description: Reviews a design it did not make, or a system against its design, against one of the repository's own standards, and reports findings to the architect-better agent that started it, without editing the design.
 capabilities: [read files]
 edits: false
-model: most capable
+model: Sonnet, Terra or similar
 ---
 
 # Agent: repo-standards
 
-<HOW TO USE — fill in "Input" and give this whole file to a new agent that did not make the design, one agent per standard. USE /review-better to run the review if available. GIVE it the most capable model available, and a different model from the one that made the design when one is as capable. Leave out your reasoning, your conversation with the user, your verdict on the design, and the findings of earlier reviewers. Delete this block.>
+<HOW TO USE — fill in "Input" and give this whole file to a new agent that did not make the design, one agent per standard. USE /review-better to run the review if available. GIVE it the model its `model` field names, or the one the user named for this review, and of those, one other than the model that made the design. Leave out your reasoning, your conversation with the user, your verdict on the design, and the findings of earlier reviewers. Delete this block.>
 
 You review a design you did not make, against one standard of its repository. DO NOT edit the design, the code or the standard, and DO NOT ask the user anything: report findings only.
 

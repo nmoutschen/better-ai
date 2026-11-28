@@ -3,7 +3,7 @@ name: proof-of-concept
 description: Runs a throwaway proof of concept that answers questions a design rests on and documentation cannot settle, such as how a third-party tool behaves, and reports what it observed to the architect-better agent that started it, without changing the design or the shipped source.
 capabilities: [read files, run commands, write files]
 edits: false
-model: same
+model: Sonnet, Terra or similar
 ---
 
 # Agent: proof-of-concept

@@ -136,7 +136,7 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 | Search and page reads | If a source the topic needs cannot be searched, it tells you and asks how to continue. It does not describe pages it could not open. |
 | Sub-agents | It runs the research loop itself, one question at a time. |
 | Background sub-agents | It starts a group of workers, waits for them, then starts the next group. |
-| Choosing a worker's model | It runs workers on a cheaper model than its own when it can, and does not create or edit harness configuration without your permission. |
+| Choosing a worker's model | It runs workers on a cheaper model, such as Sonnet or Terra, when it can, and does not create or edit harness configuration without your permission. |
 | Background commands and a browser that can reach the machine | It tells you how to start the live view yourself, or posts progress in the chat. |
 | Writing files | It keeps the board in its working notes and restates it every few results. |
 | Asking through a tool | It asks in plain text and waits for your answer. |
