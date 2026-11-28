@@ -40,6 +40,7 @@ WORKER_BRIEFS = (
     ("discover-better/agents/analyst.md", "PAGE FORM"),
     ("research-better/agents/worker.md", "PAGE FORM"),
     ("research-better/agents/verifier.md", "PAGE FORM"),
+    ("discover-better/agents/quote-verifier.md", "PAGE FORM"),
 )
 
 
@@ -1044,6 +1045,18 @@ class TheApprovedForm(Turns):
         self.assertTrue(approvals.verb_command(call, self.unit_dir, "/plugins/my code/better.pyz", ("add", "set")))
         event = approval(key="w1", arguments={"command": call, "description": "Log a step"}, requester="builder-t3e")
         self.assertEqual(self.answered(driver, event, "w1"), ("allow_once", "Approved page command"))
+
+    def test_a_verifier_sets_verified_or_counts_with_its_saved_file_in_the_form_verifier_t3e(self):
+        # research-better verifier step 9 and discover quote-verifier: `set ... --raw <file>` (the rule reads the file).
+        archive = "/plugins/my code/better.pyz"
+        head = shlex.join((sys.executable, archive, "set", str(self.unit_dir)))
+        body = ' <<\'EOF\'\n{"status": "verified"}\nEOF'
+        approved = head + " C-w1-1 --by verifier-1 --raw /tmp/research/verifier-1/page.txt" + body
+        self.assertTrue(approvals.verb_command(approved, self.unit_dir, archive, ("add", "set")))
+        for bad in ("--raw page.txt", "--raw '/a b/page.txt'", "--raw", "--raw ../page.txt"):
+            with self.subTest(bad=bad):
+                call = head + " C-w1-1 --by verifier-1 " + bad + body
+                self.assertFalse(approvals.verb_command(call, self.unit_dir, archive, ("add", "set")))
 
     def test_the_page_agent_reads_ids_only_past_the_most_items_a_prompt_holds_N3(self):
         self.assertIn("IF only item IDs are supplied, RUN `pending` for the full copy.", PAGE_AGENT.read_text())
