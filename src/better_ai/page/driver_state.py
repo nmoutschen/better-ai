@@ -7,6 +7,8 @@ import json
 import os
 import stat
 import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..paths import NOFOLLOW, Refused
@@ -96,3 +98,31 @@ def store_log(unit, records: list[dict]) -> list[dict]:
         total += len(line)
     write_private(unit, LOG, b"".join(reversed(lines)))
     return records[len(records) - len(lines) :]
+
+
+# --- Until T4's version of these three lands (decision D11): `serve` and the verbs call exactly these names.
+
+
+def load_state(unit) -> dict | None:
+    try:
+        state = json.loads(private_bytes(unit, STATE))
+    except (ValueError, UnicodeError):
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def record_end(unit, kind: str, reason: str, build: str) -> None:
+    state = load_state(unit) or {}
+    before = state.get("ended") if isinstance(state.get("ended"), dict) else {}
+    again = kind == "driver" and before.get("kind") == "driver" and before.get("reason") == reason
+    again = again and before.get("build") == build
+    repeats = (before.get("repeats", 0) + 1 if again else 1) if kind == "driver" else 0
+    at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ended = {"at": at, "reason": reason, "kind": kind, "build": build, "repeats": repeats}
+    write_private(unit, STATE, encode({"version": 1, **state, "ended": ended}))
+
+
+def log_verb(unit, verb: str, code: int) -> None:
+    log_append = {"type": "verb", "at": time.time(), "verb": verb, "exit": code}
+    with contextlib.suppress(OSError):
+        write_private(unit, LOG, private_bytes(unit, LOG) + encode(log_append))

@@ -19,6 +19,15 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+STUB_DIR = ROOT / "tests" / "fixtures" / "stub-harness"
+
+
+def stub_env():
+    """The environment of every test module: the stub harness first on PATH, as the one a served page finds, and the
+    marker that lets `serve` skip the browser."""
+    env = dict(os.environ)
+    env.update(PATH=f"{STUB_DIR}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1")
+    return env
 
 
 def run_module(name):
@@ -30,6 +39,7 @@ def run_module(name):
             cwd=ROOT,
             capture_output=True,
             text=True,
+            env=stub_env(),
         )
         try:
             result = json.loads(result_file.read_text())
@@ -40,6 +50,12 @@ def run_module(name):
 
 def child(name, result_file):
     """Run one module the way discover imports it and write its counts as JSON."""
+    import webbrowser
+
+    def no_browser(*args, **kwargs):
+        raise AssertionError("a test opened a real browser")
+
+    webbrowser.open = no_browser
     suite = unittest.TestLoader().discover("tests", pattern=f"{name}.py")
     result = unittest.TextTestRunner(stream=sys.stdout, verbosity=1).run(suite)
     counts = {

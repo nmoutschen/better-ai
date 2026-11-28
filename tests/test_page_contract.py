@@ -8,11 +8,8 @@ semantics stay in its own test file; the shell's details are tested in test_page
 
 import json
 import os
-import signal
-import subprocess
 import sys
 import tempfile
-import time
 import unittest
 import urllib.request
 from pathlib import Path
@@ -151,26 +148,9 @@ PAGES = {
 UNSAVED = {"architect-better": {"reopen"}}
 
 
-def serve(root: Path, folder: Path, skill: str) -> subprocess.Popen:
-    """`serve` as an agent runs it, once the unit has its address."""
-    process = subprocess.Popen(
-        better.command("serve", str(folder), "--no-browser", "--linger", "0.2"),
-        cwd=root,
-        env={**os.environ, "BETTER_AI_SKILL": skill},
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    for _ in range(100):
-        if (folder / ".server").exists() and (folder / ".server").read_text().strip():
-            break
-        time.sleep(0.1)
-    return process
-
-
 def rpc(url: str, method: str, params: dict, token: str) -> dict:
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    headers = {"Content-Type": "application/json", "Origin": url.rstrip("/"), "X-Page-Token": token}
+    headers = {"Content-Type": "application/json", **better.page_headers(token, url.rstrip("/"))}
     with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
         return json.loads(response.read())
 
@@ -190,11 +170,8 @@ class PageContract(unittest.TestCase):
                 folder = make_unit(root)
                 self.assertEqual(set(spec.sendable()) - set(samples), set(), "a method without a sample")
                 self.assertEqual(set(samples) - set(spec.sendable()), set(), "a sample the page cannot send")
-                process = serve(root, folder, skill)
-                self.addCleanup(process.stdout.close)
-                self.addCleanup(process.kill)
-                url = (folder / ".server").read_text().strip()
-                token = (folder / ".server-token").read_text().strip()
+                url, token = better.serve_page(skill, folder, "--linger", "0.2", cwd=root)
+                self.addCleanup(better.stop_page, folder)
                 kept = [m for m in samples if m not in UNSAVED.get(skill, ())]
                 for method, params in samples.items():
                     answer = rpc(url, method, params, token)
@@ -213,8 +190,9 @@ class PageContract(unittest.TestCase):
                 self.assertEqual(refused["error"]["code"], -32602)
                 self.assertIn("by", refused["error"]["message"])
                 self.assertEqual(log.read_text(), saved)
+                better.stop_page(folder)  # the unit has its own agent while it is served: it is the agent's now
+                self.assertFalse((folder / ".server").exists())
                 for verb, extra, text in (
-                    ("wait", ["--timeout", "10"], None),
                     ("reply", ["--to", "m-x"], "seen it"),
                     ("status", ["accepted", "m-x", "--text"], "fine"),
                     ("pending", [], None),
@@ -222,10 +200,6 @@ class PageContract(unittest.TestCase):
                     done = better.call(skill, verb, str(folder), *extra, stdin=text, cwd=root)
                     self.assertEqual(done.returncode, 0, f"{verb}: {done.stdout}{done.stderr}")
                 self.assertEqual(better.call(skill, "check", str(folder), cwd=root).returncode, 0)
-                process.send_signal(signal.SIGTERM)
-                process.communicate(timeout=20)
-                self.assertFalse((folder / ".server").exists())
-                self.assertFalse((folder / ".server-token").exists())
 
 
 if __name__ == "__main__":

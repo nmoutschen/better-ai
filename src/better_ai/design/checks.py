@@ -6,11 +6,11 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from .. import paths
-from ..page import ADDRESS, LOG, SEEN, TOKEN
+from ..page import ADDRESS, DRIVER, DRIVER_LOG, LOG
 from ..schema import Context, hook
 
 PAGE = "index.html"  # what `render` writes in the unit: no version may be this file
-STATE = (LOG, ADDRESS, SEEN, TOKEN)  # the live page's own files
+STATE = (LOG, ADDRESS, DRIVER, DRIVER_LOG)  # the live page's own files
 
 
 def is_page(path: str | None) -> bool:

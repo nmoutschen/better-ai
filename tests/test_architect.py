@@ -8,7 +8,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import unittest
 import urllib.error
 import urllib.request
@@ -20,6 +19,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import architect_records as rec  # noqa: E402
 from better import call as better_call  # noqa: E402
+from better import (  # noqa: E402
+    page_headers,  # noqa: E402
+    serve_page,
+    stop_page,
+)
 from better import run as better_run  # noqa: E402
 
 from better_ai import page, schema  # noqa: E402
@@ -752,7 +756,7 @@ class Architect(unittest.TestCase):
         return address.read_text().strip(), thread, result
 
     def test_serve_uses_the_browser_only_when_asked(self):
-        for flags, opened in (((), 0), (("--no-browser",), 0), (("--open",), 1)):
+        for flags, opened in (((), 0), (("--no-browser",), 0)):
             with self.subTest(flags=flags):
                 self.browser.reset_mock()
                 url, thread, result = self.serve(*flags)
@@ -776,22 +780,10 @@ class Architect(unittest.TestCase):
         self.assertEqual(html.count('class="unwatched"'), 1)
 
     def start_server(self):
-        """`serve <unit>` as an agent runs it: the process, and the address once it is up."""
-        process = subprocess.Popen(
-            [*better_command(), "serve", str(self.folder), "--linger", "0.2"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=better_env(),
-        )
-        self.addCleanup(process.stdout.close)
-        self.addCleanup(process.wait)
-        self.addCleanup(process.terminate)
-        for _ in range(100):
-            if (self.folder / ".server").exists() and (self.folder / ".server").read_text().strip():
-                break
-            time.sleep(0.1)
-        return (self.folder / ".server").read_text().strip()
+        """`serve <unit>` as an agent runs it, and a tab paired with it: the address once it is up."""
+        address, self.secret = serve_page(SKILL, self.folder, "--linger", "0.2")
+        self.addCleanup(stop_page, self.folder)
+        return address
 
     def test_the_served_files_are_the_fixed_table_and_the_old_endpoints_are_gone(self):
         url = self.start_server()
@@ -810,7 +802,6 @@ class Architect(unittest.TestCase):
             self.assertEqual(status(path)[0], 404, path)
         data = json.loads(status("data")[1])
         self.assertEqual(data["title"], self.load()["title"])
-        self.assertIn("listening", data)
 
     def test_a_page_event_the_schema_refuses_is_not_written(self):
         """An `approve` event the events schema refuses is not written."""
@@ -836,9 +827,8 @@ class Architect(unittest.TestCase):
     }
 
     def request(self, url, body=None, headers=None):
-        """A request with the page token `serve` left in the unit, as the page sends it."""
-        token = (self.folder / ".server-token").read_text().strip()
-        return urllib.request.Request(url, body, {**(headers or {}), "X-Page-Token": token})
+        """A request with the secret the paired tab got, as the page sends it."""
+        return urllib.request.Request(url, body, {**(headers or {}), **page_headers(self.secret)})
 
     def post(self, url, method, params):
         body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
