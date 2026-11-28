@@ -1070,8 +1070,17 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
         spots = on_top[node]
         if node not in selfs:
             return bx + bw * (spots.index(ident) + 1) / (len(spots) + 1)
-        # From the left end, so that the labels, which run right, have room before the loops.
+        # From the left end, so that the labels, which run right, have room before the loops: each one after the
+        # label before it when they all fit, else at even steps.
         room = bw - 36 - 12 * len(selfs[node])
+        steps = [
+            14 + max(map(lambda line: width(line, LABEL), wrap(edges[e]["label"], LABEL, GAP - 70))) + 15
+            if edges[e]["from"] == node and edges[e].get("label")
+            else 26
+            for e in spots
+        ]
+        if 16 + sum(steps[:-1]) <= room:
+            return bx + 16 + sum(steps[: spots.index(ident)])
         return bx + 16 + (room - 16) * spots.index(ident) / len(spots)
 
     loops, number = {}, 0
