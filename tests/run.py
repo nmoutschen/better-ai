@@ -68,11 +68,17 @@ def child(name, result_file):
         "expected_failures": len(result.expectedFailures),
         "unexpected_successes": len(result.unexpectedSuccesses),
     }
+    helpers = sys.modules.get("better")
+    left = helpers.leftover_servers() if helpers else []
+    for unit in left:
+        print(f"a test left the server of {unit} running")
+    if left:
+        counts["errors"] += 1
     Path(result_file).write_text(json.dumps(counts))
     if suite.countTestCases() == 0:
         print(f"no tests found for {name}")
         return 1
-    return 0 if result.wasSuccessful() else 1
+    return 0 if result.wasSuccessful() and not left else 1
 
 
 def main():

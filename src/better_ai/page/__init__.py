@@ -1113,23 +1113,25 @@ def cwd_of(pid: int) -> str | None:
 
 def is_serve_of(pid: Any, unit: Unit) -> bool:
     """Whether the process is a `serve` of this unit: the word `serve` and then an argument that names the unit, in any
-    spelling (a trailing slash, a relative path from the serve's own folder, a symlink)."""
-    words = (command_of(pid) or "").split()
-    if "serve" not in words:
-        return False
+    spelling (a trailing slash, a relative path from the serve's own folder, a symlink). `ps` joins the arguments with
+    spaces, so a path that holds spaces spans several words: every run of words after `serve` is tried as one path."""
+    words = (command_of(pid) or "").split(" ")
     here = cwd_of(pid)
     target = os.path.realpath(unit.path)
-    for word in words[words.index("serve") + 1 :]:
-        if word.startswith("-"):
+    for at, word in enumerate(words):
+        if word != "serve":
             continue
-        if os.path.isabs(word):
-            candidate = word
-        elif here:
-            candidate = os.path.join(here, word)
-        else:
-            continue
-        if os.path.realpath(candidate) == target:
-            return True
+        for start in range(at + 1, len(words)):
+            if not words[start] or words[start].startswith("-"):
+                continue
+            for end in range(start + 1, len(words) + 1):
+                path = " ".join(words[start:end])
+                if not os.path.isabs(path):
+                    if not here:
+                        continue
+                    path = os.path.join(here, path)
+                if os.path.realpath(path) == target:
+                    return True
     return False
 
 

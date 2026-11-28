@@ -121,16 +121,26 @@ def page_headers(secret: str, origin: str | None = None) -> dict[str, str]:
     return headers
 
 
-def stop_page(unit: Path) -> None:
-    """End the server a test started, as a harness ends a command, and wait until it and its harness are gone."""
+# What `.driver` held when `serve_page` served each unit, by its real path: `stop_page` ends a server from it when the
+# unit's folder is already gone, and `leftover_servers` ends what no test stopped.
+_SERVED: dict[str, dict] = {}
+
+
+def _driver_state(unit: Path) -> dict | None:
     import json
-    import signal
-    import time
 
     try:
         state = json.loads((Path(unit) / ".driver").read_text())
     except (OSError, ValueError):
-        return
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def _end(state: dict) -> bool:
+    """End a server and its harness, as a harness ends a command; whether the server is gone within five seconds."""
+    import signal
+    import time
+
     for pid, kill in ((state.get("server_pid"), os.kill), (state.get("child_pid"), os.killpg)):
         if type(pid) is int and pid > 1 and pid != os.getpid():
             with contextlib.suppress(ProcessLookupError, PermissionError):
@@ -139,8 +149,31 @@ def stop_page(unit: Path) -> None:
         try:
             os.kill(state.get("server_pid") or 0, 0)
         except (ProcessLookupError, PermissionError, OverflowError):
-            return
+            return True
         time.sleep(0.05)
+    return False
+
+
+def stop_page(unit: Path) -> None:
+    """End the server a test started and wait until it is gone, also after the unit's folder was removed."""
+    key = os.path.realpath(unit)
+    state = _driver_state(unit) or _SERVED.get(key)
+    if state and _end(state):
+        _SERVED.pop(key, None)
+
+
+def leftover_servers() -> list[str]:
+    """The units whose server `serve_page` started and no `stop_page` ended; ends them."""
+    left = []
+    for key, state in list(_SERVED.items()):
+        try:
+            os.kill(state.get("server_pid") or 0, 0)
+            left.append(key)
+        except (ProcessLookupError, PermissionError, OverflowError):
+            pass
+        _end(state)
+    _SERVED.clear()
+    return left
 
 
 def serve_page(skill: str, unit: Path, *flags: str, cwd: str | Path | None = None) -> tuple[str, str]:
@@ -163,6 +196,10 @@ def serve_page(skill: str, unit: Path, *flags: str, cwd: str | Path | None = Non
     link = re.search(r"at (http://\S+)", done.stdout)
     if done.returncode != 0 or not link:
         raise AssertionError(f"serve failed: {done.stdout}{done.stderr}")
+    folder = Path(cwd or ".") / unit
+    state = _driver_state(folder)
+    if state:
+        _SERVED[os.path.realpath(folder)] = state
     address, token = link.group(1).split("#p=")
     host = address.split("//")[1].rstrip("/")
     connection = http.client.HTTPConnection(host, timeout=10)
