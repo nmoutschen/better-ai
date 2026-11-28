@@ -268,8 +268,8 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .tage { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); }
 .tgist { display:block; margin:var(--space-tight) 0 0; font-size:var(--text-message); line-height:1.45; color:var(--heading); }
 .twho { font-weight:700; }
-.tfoot { display:flex; flex-wrap:nowrap; justify-content:space-between; align-items:center; gap:var(--space-tight) var(--space-control); margin-top:var(--space-control); }
-.tleft { min-width:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:baseline; font-size:var(--text-small); color:var(--muted); }
+.tfoot { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-tight) var(--space-control); margin-top:var(--space-control); }
+.tleft { flex:1 1 9rem; min-width:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:baseline; font-size:var(--text-small); color:var(--muted); }
 .tleft .link { border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
 .tacts { flex:none; display:flex; gap:var(--space-control); margin-left:auto; }
 .tacts .close { min-width:2.25rem; }

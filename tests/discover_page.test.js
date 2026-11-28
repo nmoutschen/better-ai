@@ -353,7 +353,7 @@ test('S6, A22: a question about a risk sits in its State cell with the question,
   assert.match(r1, /<a href="#row-D2" data-goto="D2">D2<\/a>: Will you build B1 without knowing whether people read it\?/);
   assert.doesNotMatch(r1, /It may be noise/);
   assert.match(r1, /Suggested default: Accept the risk/);
-  assert.match(r1, /data-use="D2" aria-label="Use the default for D2">✓</);
+  assert.match(r1, /class="btn btn--sm btn--quiet answer" data-use="D2" aria-label="Use the default for D2">Use the default</);  // D11: ✓ only ever closes
   assert.match(r1, /data-answer="D2" aria-label="Answer D2">Answer</);
 });
 
@@ -542,7 +542,7 @@ test('A5: the page\'s own controls use five verbs, plus Send and Cancel, and the
   const forms = a.addEvidenceForm(d) + a.resultForm(d.tests[0]) + a.removeForm(d.items[0], d.head) + a.changeForm('item', 'P1');
   const labels = buttonLabels(html + forms);
   assert.ok(labels.length > 10);
-  const allowed = /^(Add|Change|Remove|Answer|Choose|Send|Cancel|✓)/;
+  const allowed = /^(Add|Change|Remove|Answer|Choose|Send|Cancel|Use the default|✓)/;  // D11: the default is used with words, not a bare check
   for (const label of labels) assert.match(label, allowed, label);
   assert.ok(labels.includes('Choose a move…'), 'the exit action reads Choose a move…');
   assert.doesNotMatch(html, /Reopen|Edit|Delete|Update|Save|Submit|Create|Approve|Reply/);

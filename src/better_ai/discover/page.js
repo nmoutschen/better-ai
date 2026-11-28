@@ -277,11 +277,11 @@ function riskSettled(item, risk, data, known) {
   if (!answer) return '<span class="muted">Nothing yet</span>';
   return answer.type === 'decision' ? idLink(s(answer.id), known) : 'You, ' + (answer.type === 'chat' ? 'in the chat' : 'on the page');
 }
-// A waiting question about a risk, in the risk's State cell: its ID, its first sentence, its default, and ✓ and Answer.
+// A waiting question about a risk, in the risk's State cell: its ID, its first sentence, its default, Use the default and Answer.
 function riskQuestion(d, known) {
   return '<div class="rq" data-d="' + esc(d.id) + '"><p>' + idLink(d.id, known) + ': ' + esc(firstSentence(d.asked).first) + '</p>' +
     (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
-    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">✓</button>' : '') +
+    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm btn--quiet answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">Use the default</button>' : '') +
     '<button type="button" class="btn btn--sm btn--quiet" data-answer="' + esc(d.id) + '" aria-label="Answer ' + esc(d.id) + '">Answer</button></div></div>';
 }
 function risksOf(item, data, ctx, known) {
@@ -473,7 +473,7 @@ function questionRow(d, data, ctx, known) {
   const due = (d.about || {}).type === 'discovery';
   return '<li class="q" id="row-' + esc(d.id) + '" data-d="' + esc(d.id) + '"><div><strong>' + esc(d.id) + '</strong> <span class="muted">' + aboutHTML(d, data, known) + '</span></div>' +
     '<div class="ask">' + fold(d.asked) + '</div>' + evidenceBlock(d, data) + (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
-    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">✓</button>' : '') +
+    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm btn--quiet answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">Use the default</button>' : '') +
     '<button type="button" class="btn btn--sm btn--quiet" data-answer="' + esc(d.id) + '" aria-label="Answer ' + esc(d.id) + '">Answer</button>' +
     (due ? '<button type="button" class="btn btn--sm" data-open-picker' + (ctx.pending ? ' disabled' : '') + '>Choose a move…</button>' : '') + '</div></li>';
 }
@@ -825,7 +825,7 @@ view.addEventListener('keydown', event => {
   }
 });
 
-// ✓ and Answer act on the same question as in the conversation: the same answer events.
+// Use the default and Answer act on the same question as in the conversation: the same answer events.
 function answerHere(row, id, text, byDefault, done, fail) {
   conv.send('answer', { id: uid('a'), decision: id, text, default: byDefault }, 'Answer', done, fail);
 }

@@ -1139,9 +1139,10 @@ test('rows shown elsewhere (nodes) are open, without actions, and their head is 
   assert.ok(row.querySelector('.tbody'));
 });
 
-test('a row keeps its buttons on one line: the left part wraps, the buttons do not', () => {
+test('a row keeps its buttons on one line: the count keeps a readable width, the buttons drop below it when crowded', () => {
   const css = read('page', 'page.css');
-  assert.match(css, /\.tfoot \{[^}]*flex-wrap:nowrap/);
+  assert.match(css, /\.tfoot \{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.tleft \{[^}]*flex:1 1 9rem/);
   assert.match(css, /\.tacts \{[^}]*flex:none/);
   assert.match(css, /\.tleft \{[^}]*min-width:0[^}]*flex-wrap:wrap/);
 });
